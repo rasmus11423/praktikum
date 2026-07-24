@@ -90,6 +90,33 @@ button#reset {
 
 .row:last-child { border-bottom: none; }
 
+/* Sectioned results: relevance tiers when a query is active, or tag groups
+   when browsing without one. Each section is just a labeled run of .row. */
+.result-section:not(:last-child) { border-bottom: 1px solid var(--border); }
+
+.section-header {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(107, 114, 128, 0.08);
+  cursor: default;
+}
+
+.section-count { font-weight: 400; }
+
+details.result-section > summary.section-header {
+  cursor: pointer;
+  list-style: none;
+}
+details.result-section > summary.section-header::-webkit-details-marker { display: none; }
+details.result-section > summary.section-header::before {
+  content: "▸ ";
+}
+details.result-section[open] > summary.section-header::before {
+  content: "▾ ";
+}
+
 .row-header {
   font-size: 0.75rem;
   font-weight: 600;

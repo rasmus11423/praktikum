@@ -97,6 +97,64 @@ function pluralize(count) {
   return count === 1 ? "tulemus" : "tulemust";
 }
 
+const RELEVANCE_TIERS = [
+  { label: "Parimad vasted", min: 0.5, max: Infinity },
+  { label: "Seotud", min: 0.15, max: 0.5 },
+  { label: "Vähem seotud", min: -Infinity, max: 0.15, collapsible: true },
+];
+
+// With a query: bucket into relevance tiers (best/related/less related),
+// since that's what "closeness in layers" means when ranking is active.
+// Without a query: there's no relevance to tier by, so group by each
+// posting's primary (first-matched) tag instead — a browsing-friendly view
+// of "what categories exist here." Both return the same shape so rendering
+// doesn't need to care which mode produced it.
+function sectionResults(items, queryActive) {
+  if (queryActive) {
+    return RELEVANCE_TIERS.map((tier) => ({
+      label: tier.label,
+      items: items.filter((item) => item.relevance >= tier.min && item.relevance < tier.max),
+      collapsible: Boolean(tier.collapsible),
+    })).filter((section) => section.items.length > 0);
+  }
+
+  const groups = new Map();
+  for (const item of items) {
+    const key = item.tags[0] || "Muu";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return [...groups.entries()]
+    .map(([label, groupItems]) => ({ label, items: groupItems, collapsible: false }))
+    .sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
+}
+
+function renderSections(items, queryTokens) {
+  const sections = sectionResults(items, queryTokens.length > 0);
+
+  return sections
+    .map((section) => {
+      const rows = section.items.map((item) => renderRow(item, queryTokens)).join("");
+      const header = `${escapeHtml(section.label)} <span class="section-count">(${section.items.length})</span>`;
+
+      if (section.collapsible) {
+        return `
+          <details class="result-section">
+            <summary class="section-header">${header}</summary>
+            ${rows}
+          </details>
+        `;
+      }
+      return `
+        <div class="result-section">
+          <div class="section-header">${header}</div>
+          ${rows}
+        </div>
+      `;
+    })
+    .join("");
+}
+
 // Renders the tag dropdown's checkbox list from live facet counts (how many
 // of the *current* results carry each tag), preserving which tags are
 // checked across re-renders.
@@ -150,7 +208,7 @@ async function runSearch() {
     }
 
     statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
-    resultsEl.innerHTML = body.map((item) => renderRow(item, queryTokens)).join("");
+    resultsEl.innerHTML = renderSections(body, queryTokens);
 
     if (facetsRes.ok) {
       const facetsBody = await facetsRes.json();

@@ -247,4 +247,11 @@ The CSV is loaded once at startup. Swap the file and restart the server to pick 
 
 Results render as a single-line horizontal row per posting (not a card grid) — relevance badge, name, company, pay, employment type, tags, deadline, a truncated description (full text + tags on hover), and a link out to the original posting. When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
 
+Rows are also grouped into sections, computed client-side in `public/js/app.js` from the `relevance`/`tags` already in each `/api/search` result — no extra backend call:
+
+- **With a query active:** three relevance tiers — "Parimad vasted" (≥ 0.5), "Seotud" (0.15–0.5), and "Vähem seotud" (< 0.15, collapsed by default behind a native `<details>` disclosure, since that tier is the most likely to just be noise on a specific query).
+- **Browsing with no query:** grouped by each posting's primary tag (its first matched tag; taglessones land in "Muu"), sections ordered largest-first — a quick view of what categories exist in the current filter set.
+
+The 0.5 / 0.15 tier cutoffs are hand-picked against this sample dataset's actual score spread, not derived from anything principled — expect to retune them if the postings or ranking algorithm change enough to shift the distribution.
+
 It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.
