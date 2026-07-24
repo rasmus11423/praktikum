@@ -1,0 +1,12 @@
+services:
+  internship-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    volumes:
+      - ../data:/app/data:ro
+    environment:
+      - PORT=8080
+    restart: unless-stopped
