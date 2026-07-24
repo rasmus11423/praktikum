@@ -36,6 +36,13 @@
         <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
       </fieldset>
 
+      <div class="tag-filter">
+        <button type="button" id="tagFilterToggle" class="tag-filter-toggle" aria-expanded="false">
+          Sildid<span id="tagFilterCount"></span> ▾
+        </button>
+        <div id="tagFilterPanel" class="tag-filter-panel hidden"></div>
+      </div>
+
       <button type="submit">Otsi</button>
       <button type="button" id="reset">Lähtesta</button>
     </form>

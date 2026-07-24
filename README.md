@@ -119,6 +119,7 @@ Query params (all optional, combinable):
 | `q`                | `q=panga` | **ranks, doesn't filter** — see "How `q` ranking works" below |
 | `pay_specified`    | `pay_specified=true` | `true` or `false` — whether `pay` lists an actual amount vs. "Pole märgitud" |
 | `type`             | `type=täiskoormusega`| must match one of the `employment_type` values actually present in the data (currently `täiskoormusega`, `tähtajaline`) — validated dynamically, not hardcoded |
+| `tags`             | `tags=Pangandus%20ja%20rahandus` | repeatable (`tags=A&tags=B`); OR-matched (posting needs at least one), validated against tags actually present in the data — see "Tags" below |
 | `deadline_after`   | `deadline_after=2026-09-01` | ISO date, inclusive lower bound        |
 | `deadline_before`  | `deadline_before=2026-09-30`| ISO date, inclusive upper bound        |
 
@@ -162,8 +163,26 @@ without that, `kommunikatsioon` would wrongly fire inside `telekommunikatsioonia
 It's not a classifier and has no ML/training step — it's approximate and will
 need occasional keyword tuning as new postings introduce vocabulary it
 doesn't cover (currently one posting in the sample data ends up with no tags
-at all, which is an expected gap, not a bug). There's no `tags` search/filter
-param yet — this first pass only makes tags visible on each result.
+at all, which is an expected gap, not a bug).
+
+Filter by tag with the repeatable `tags` param (`tags=A&tags=B`, OR logic —
+a posting needs at least one of the given tags). Unknown tag values return
+`400` listing the valid ones, same pattern as `type`.
+
+### `GET /api/facets`
+Same query params as `/api/search` (any `tags` value passed is accepted but
+ignored — facets always describe what's available to add, not what's already
+selected). Returns tag counts under the *other* active filters:
+
+```json
+{ "tags": [ { "tag": "Pangandus ja rahandus", "count": 9 }, { "tag": "Tarkvaraarendus", "count": 6 }, ... ] }
+```
+
+Sorted by count descending, then alphabetically. This is what powers the
+frontend's tag dropdown (checkbox + live count per tag) and doubles as a
+"what categories exist under this search" breakdown. Since `q` only ranks
+and never excludes results (see above), facet counts don't change based on
+`q` alone — only `pay_specified`/`type`/`deadline_*`/`tags` narrow them.
 
 ### `GET /api/internships/:id`
 Returns a single posting, or `404` with a JSON error body if the id doesn't exist.
@@ -189,12 +208,20 @@ curl "http://localhost:8080/api/search?deadline_after=2026-09-01&deadline_before
 # Combined filters
 curl -G "http://localhost:8080/api/search" --data-urlencode "q=praktikant" -d "pay_specified=true" --data-urlencode "type=tähtajaline"
 
+# Filter by tag (repeat the param for OR across multiple tags)
+curl -G "http://localhost:8080/api/search" --data-urlencode "tags=Tarkvaraarendus" --data-urlencode "tags=Andmeteadus ja analüütika"
+
+# Tag facet counts (add other filters to see counts narrow)
+curl http://localhost:8080/api/facets
+curl -G "http://localhost:8080/api/facets" --data-urlencode "type=tähtajaline"
+
 # Single posting
 curl http://localhost:8080/api/internships/5
 
 # Error cases
 curl -i "http://localhost:8080/api/search?pay_specified=maybe"   # 400
 curl -i "http://localhost:8080/api/search?type=bogus"            # 400, lists valid types
+curl -i -G "http://localhost:8080/api/search" --data-urlencode "tags=Bogus"  # 400, lists valid tags
 curl -i http://localhost:8080/api/internships/does-not-exist     # 404
 ```
 
@@ -216,7 +243,7 @@ The CSV is loaded once at startup. Swap the file and restart the server to pick 
 
 ## Test frontend
 
-`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, and a "Tähtaeg" (deadline) date range.
+`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, a "Tähtaeg" (deadline) date range, and a "Sildid" (tags) dropdown — a checkbox panel showing every tag with a live count of how many current results carry it (from `/api/facets`), refetched on every filter change so the counts stay accurate as you narrow down.
 
 Results render as a single-line horizontal row per posting (not a card grid) — relevance badge, name, company, pay, employment type, tags, deadline, a truncated description (full text + tags on hover), and a link out to the original posting. When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
 

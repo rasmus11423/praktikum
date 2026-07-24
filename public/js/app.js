@@ -1,6 +1,11 @@
 const form = document.getElementById("filters");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
+const tagFilterToggle = document.getElementById("tagFilterToggle");
+const tagFilterPanel = document.getElementById("tagFilterPanel");
+const tagFilterCount = document.getElementById("tagFilterCount");
+
+let selectedTags = new Set();
 
 function buildQuery() {
   const params = new URLSearchParams();
@@ -19,6 +24,8 @@ function buildQuery() {
 
   const deadlineBefore = form.deadline_before.value;
   if (deadlineBefore) params.set("deadline_before", deadlineBefore);
+
+  for (const tag of selectedTags) params.append("tags", tag);
 
   return params;
 }
@@ -90,23 +97,65 @@ function pluralize(count) {
   return count === 1 ? "tulemus" : "tulemust";
 }
 
+// Renders the tag dropdown's checkbox list from live facet counts (how many
+// of the *current* results carry each tag), preserving which tags are
+// checked across re-renders.
+function renderTagPanel(facets) {
+  tagFilterCount.textContent = selectedTags.size ? ` (${selectedTags.size})` : "";
+
+  if (!facets.length) {
+    tagFilterPanel.innerHTML = `<p class="tag-filter-empty">Sildid puuduvad.</p>`;
+    return;
+  }
+
+  tagFilterPanel.innerHTML = facets
+    .map(({ tag, count }) => {
+      const checked = selectedTags.has(tag) ? "checked" : "";
+      return `
+        <label class="tag-option">
+          <input type="checkbox" value="${escapeHtml(tag)}" ${checked}>
+          <span class="tag-option-label">${escapeHtml(tag)}</span>
+          <span class="tag-option-count">(${count})</span>
+        </label>
+      `;
+    })
+    .join("");
+
+  tagFilterPanel.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedTags.add(checkbox.value);
+      else selectedTags.delete(checkbox.value);
+      runSearch();
+    });
+  });
+}
+
 async function runSearch() {
   const params = buildQuery();
+  const queryString = params.toString();
   const queryTokens = form.q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   statusEl.textContent = "Otsin…";
 
   try {
-    const res = await fetch(`/api/search?${params.toString()}`);
-    const body = await res.json();
+    const [searchRes, facetsRes] = await Promise.all([
+      fetch(`/api/search?${queryString}`),
+      fetch(`/api/facets?${queryString}`),
+    ]);
+    const body = await searchRes.json();
 
-    if (!res.ok) {
-      statusEl.textContent = `Viga: ${body.error || res.statusText}`;
+    if (!searchRes.ok) {
+      statusEl.textContent = `Viga: ${body.error || searchRes.statusText}`;
       resultsEl.innerHTML = "";
       return;
     }
 
     statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
     resultsEl.innerHTML = body.map((item) => renderRow(item, queryTokens)).join("");
+
+    if (facetsRes.ok) {
+      const facetsBody = await facetsRes.json();
+      renderTagPanel(facetsBody.tags);
+    }
   } catch (err) {
     statusEl.textContent = `Päring ebaõnnestus: ${err.message}`;
     resultsEl.innerHTML = "";
@@ -139,7 +188,21 @@ form.addEventListener("submit", (e) => {
 
 document.getElementById("reset").addEventListener("click", () => {
   form.reset();
+  selectedTags.clear();
   runSearch();
+});
+
+tagFilterToggle.addEventListener("click", () => {
+  const opening = tagFilterPanel.classList.contains("hidden");
+  tagFilterPanel.classList.toggle("hidden");
+  tagFilterToggle.setAttribute("aria-expanded", String(opening));
+});
+
+document.addEventListener("click", (e) => {
+  if (tagFilterPanel.classList.contains("hidden")) return;
+  if (tagFilterPanel.contains(e.target) || tagFilterToggle.contains(e.target)) return;
+  tagFilterPanel.classList.add("hidden");
+  tagFilterToggle.setAttribute("aria-expanded", "false");
 });
 
 populateEmploymentTypes().then(runSearch);

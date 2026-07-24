@@ -109,6 +109,14 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
         if (filters.deadline_before && item.deadline > *filters.deadline_before) {
             continue;
         }
+        if (filters.tags && !filters.tags->empty()) {
+            bool has_any = std::any_of(filters.tags->begin(), filters.tags->end(),
+                                       [&](const std::string& tag) {
+                                           return std::find(item.tags.begin(), item.tags.end(),
+                                                             tag) != item.tags.end();
+                                       });
+            if (!has_any) continue;
+        }
         results.push_back(item);
     }
 
@@ -133,4 +141,17 @@ std::vector<std::string> InternshipStore::distinct_employment_types() const {
     }
     std::sort(types.begin(), types.end());
     return types;
+}
+
+std::vector<std::string> InternshipStore::distinct_tags() const {
+    std::vector<std::string> tags;
+    for (const auto& item : items_) {
+        for (const auto& tag : item.tags) {
+            if (std::find(tags.begin(), tags.end(), tag) == tags.end()) {
+                tags.push_back(tag);
+            }
+        }
+    }
+    std::sort(tags.begin(), tags.end());
+    return tags;
 }

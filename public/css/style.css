@@ -114,6 +114,57 @@ button#reset {
 .pay-unspecified { color: var(--muted); font-style: italic; }
 .no-tags { opacity: 0.5; }
 
+/* Tag filter: a toggle button that opens a checkbox panel with live facet
+   counts (how many current results carry each tag). */
+.tag-filter { position: relative; }
+
+.tag-filter-toggle {
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.9rem;
+}
+
+#tagFilterCount {
+  font-weight: 600;
+}
+
+.tag-filter-panel {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 10;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.tag-filter-panel.hidden { display: none; }
+
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tag-option:hover { background: rgba(52, 87, 213, 0.08); }
+
+.tag-option-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.tag-option-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.tag-filter-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem; }
+
 .row-link {
   font-size: 0.82rem;
   color: var(--accent);

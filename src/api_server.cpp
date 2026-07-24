@@ -1,6 +1,7 @@
 #include "api_server.hpp"
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,27 @@ std::optional<SearchFilters> parse_filters(const httplib::Request& req,
         filters.employment_type = *match;
     }
 
+    if (req.has_param("tags")) {
+        auto known = store.distinct_tags();
+        std::vector<std::string> requested;
+        for (size_t i = 0; i < req.get_param_value_count("tags"); ++i) {
+            requested.push_back(req.get_param_value("tags", i));
+        }
+        std::vector<std::string> resolved;
+        for (const auto& raw : requested) {
+            std::string lower_raw = to_lower(raw);
+            auto match = std::find_if(known.begin(), known.end(), [&](const std::string& t) {
+                return to_lower(t) == lower_raw;
+            });
+            if (match == known.end()) {
+                error = "Invalid 'tags' value: '" + raw + "' — must be one of " + join(known, ", ");
+                return std::nullopt;
+            }
+            resolved.push_back(*match);
+        }
+        filters.tags = resolved;
+    }
+
     if (req.has_param("deadline_before")) {
         std::string raw = req.get_param_value("deadline_before");
         if (!is_valid_iso_date(raw)) {
@@ -113,6 +135,26 @@ json search_results_to_json(const std::vector<Internship>& items,
     return arr;
 }
 
+// Counts how many of the given postings carry each tag, sorted by count
+// descending (most common category first) then alphabetically.
+json tag_facet_counts(const std::vector<Internship>& items) {
+    std::map<std::string, int> counts;
+    for (const auto& item : items) {
+        for (const auto& tag : item.tags) counts[tag]++;
+    }
+
+    std::vector<std::pair<std::string, int>> sorted(counts.begin(), counts.end());
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+
+    json arr = json::array();
+    for (const auto& [tag, count] : sorted) {
+        arr.push_back({{"tag", tag}, {"count", count}});
+    }
+    return arr;
+}
+
 }  // namespace
 
 ApiServer::ApiServer(InternshipStore& store, std::string public_dir)
@@ -139,6 +181,21 @@ bool ApiServer::listen(const std::string& host, int port) {
         }
         res.set_content(search_results_to_json(store_.search(*filters), filters->q).dump(),
                         "application/json");
+    });
+
+    svr.Get("/api/facets", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string error;
+        auto filters = parse_filters(req, store_, error);
+        if (!filters) {
+            send_error(res, 400, error);
+            return;
+        }
+        // Facets always answer "what tags are available given the other
+        // active filters?" — so an already-selected `tags` filter doesn't
+        // shrink its own facet list to just what's currently checked.
+        filters->tags = std::nullopt;
+        json body = {{"tags", tag_facet_counts(store_.search(*filters))}};
+        res.set_content(body.dump(), "application/json");
     });
 
     svr.Get(R"(/api/internships/([^/]+))", [this](const httplib::Request& req, httplib::Response& res) {

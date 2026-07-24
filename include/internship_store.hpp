@@ -10,6 +10,7 @@ struct SearchFilters {
     std::optional<std::string> q;                  // keyword, matched case-insensitively
     std::optional<bool> pay_specified;               // whether "tasu" lists an actual amount
     std::optional<std::string> employment_type;      // exact match, case-insensitive
+    std::optional<std::vector<std::string>> tags;     // OR-matched: posting needs at least one
     std::optional<std::string> deadline_before;      // ISO date, inclusive upper bound
     std::optional<std::string> deadline_after;        // ISO date, inclusive lower bound
 };
@@ -37,6 +38,10 @@ public:
     // sorted. Used to validate the `type` query param and to populate the
     // frontend's filter dropdown without hardcoding an enum.
     std::vector<std::string> distinct_employment_types() const;
+
+    // Unique tag labels present in the loaded data, sorted. Used to validate
+    // the `tags` query param and to compute facet counts.
+    std::vector<std::string> distinct_tags() const;
 
 private:
     std::vector<Internship> items_;
