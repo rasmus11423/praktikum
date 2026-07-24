@@ -29,27 +29,39 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function renderCard(item) {
-  const payTag = item.pay_specified
-    ? `<span class="tag">${escapeHtml(item.pay)}</span>`
-    : `<span class="tag unspecified">Tasu pole märgitud</span>`;
+// Left-border tint that gets stronger the closer a result matches the query,
+// so relevance reads as "layers" at a glance instead of a flat list.
+function relevanceBorderColor(relevance) {
+  if (relevance === null || relevance === undefined) return "transparent";
+  const alpha = Math.max(0, Math.min(1, relevance));
+  return `rgba(52, 87, 213, ${alpha})`;
+}
+
+function renderRow(item) {
+  const payHtml = item.pay_specified
+    ? escapeHtml(item.pay)
+    : `<span class="pay-unspecified">Pole märgitud</span>`;
+
+  const relevanceHtml =
+    item.relevance === null || item.relevance === undefined
+      ? ""
+      : `${Math.round(item.relevance * 100)}%`;
 
   const linkHtml = item.link
-    ? `<a class="card-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Vaata kuulutust →</a>`
+    ? `<a class="row-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Vaata kuulutust →</a>`
     : "";
 
   return `
-    <article class="card">
-      <h3>${escapeHtml(item.name)}</h3>
-      <p class="company">${escapeHtml(item.company)}</p>
-      <p class="description">${escapeHtml(item.description)}</p>
-      <div class="tags">
-        ${payTag}
-        <span class="tag">${escapeHtml(item.employment_type)}</span>
-        <span class="tag">Tähtaeg: ${escapeHtml(item.deadline)}</span>
-      </div>
-      ${linkHtml}
-    </article>
+    <div class="row" style="border-left-color: ${relevanceBorderColor(item.relevance)}" title="${escapeHtml(item.description)}">
+      <span class="col-relevance">${relevanceHtml}</span>
+      <span class="col-name">${escapeHtml(item.name)}</span>
+      <span class="col-company">${escapeHtml(item.company)}</span>
+      <span class="col-pay">${payHtml}</span>
+      <span class="col-type">${escapeHtml(item.employment_type)}</span>
+      <span class="col-deadline">${escapeHtml(item.deadline)}</span>
+      <span class="col-description">${escapeHtml(item.description)}</span>
+      <span class="col-link">${linkHtml}</span>
+    </div>
   `;
 }
 
@@ -72,7 +84,7 @@ async function runSearch() {
     }
 
     statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
-    resultsEl.innerHTML = body.map(renderCard).join("");
+    resultsEl.innerHTML = body.map(renderRow).join("");
   } catch (err) {
     statusEl.textContent = `Päring ebaõnnestus: ${err.message}`;
     resultsEl.innerHTML = "";

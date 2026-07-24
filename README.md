@@ -115,13 +115,36 @@ Query params (all optional, combinable):
 
 | param             | example        | notes                                              |
 |-------------------|----------------|-----------------------------------------------------|
-| `q`                | `q=panga` | case-insensitive substring match on name, company, description |
+| `q`                | `q=panga` | **ranks, doesn't filter** — see "How `q` ranking works" below |
 | `pay_specified`    | `pay_specified=true` | `true` or `false` — whether `pay` lists an actual amount vs. "Pole märgitud" |
 | `type`             | `type=täiskoormusega`| must match one of the `employment_type` values actually present in the data (currently `täiskoormusega`, `tähtajaline`) — validated dynamically, not hardcoded |
 | `deadline_after`   | `deadline_after=2026-09-01` | ISO date, inclusive lower bound        |
 | `deadline_before`  | `deadline_before=2026-09-30`| ISO date, inclusive upper bound        |
 
 Invalid values (e.g. `pay_specified=maybe`, an unknown `type`, a malformed date) return `400` with a JSON `{"error": "..."}` body — the `type` error message lists the currently valid values.
+
+#### How `q` ranking works
+
+Unlike the other params, `q` does **not** exclude non-matching postings — every
+posting that passes the other filters is still returned, just sorted by how
+closely it matches the query (`pay_specified`/`type`/`deadline_*` remain hard
+include/exclude filters). Each result gets a `"relevance"` field in `[0, 1]`
+(`null` when there's no `q`), computed per query word against `name` (weight 5),
+`company` (weight 3), and `description` (weight 2):
+
+1. **Exact whole-word match** scores highest.
+2. **Substring match** scores next (this is what catches Estonian noun
+   declensions, e.g. a query for `praktika` still substring-matches
+   `praktikant`, `praktikandi`, etc. — which is also why a broad query like
+   `praktika` ends up giving nearly every posting a nonzero score, since
+   almost every title contains some form of that word).
+3. **Fuzzy (edit-distance) match** against each word in the field catches
+   typos and near-variants, scored lower and capped so it never outranks a
+   real substring hit.
+
+There's no semantic/synonym understanding here — "closeness" is purely
+lexical (shared characters/substrings), not conceptual. Implementation is in
+`include/search_ranking.hpp` / `src/search_ranking.cpp`.
 
 ### `GET /api/internships/:id`
 Returns a single posting, or `404` with a JSON error body if the id doesn't exist.
@@ -174,4 +197,8 @@ The CSV is loaded once at startup. Swap the file and restart the server to pick 
 
 ## Test frontend
 
-`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, and a "Tähtaeg" (deadline) date range, rendering results as cards with a link out to the original posting. It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.
+`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, and a "Tähtaeg" (deadline) date range.
+
+Results render as a single-line horizontal row per posting (not a card grid) — name, company, pay, employment type, deadline, a truncated description (full text on hover), and a link out to the original posting. When a keyword search is active, each row also gets a percentage badge and a left-edge color tint proportional to its `relevance` score, so closeness reads as layers at a glance instead of a flat list.
+
+It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.

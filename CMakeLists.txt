@@ -32,6 +32,7 @@ FetchContent_MakeAvailable(httplib json)
 add_executable(internship_server
   src/main.cpp
   src/csv_parser.cpp
+  src/search_ranking.cpp
   src/internship_store.cpp
   src/api_server.cpp
 )

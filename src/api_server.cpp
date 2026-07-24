@@ -7,6 +7,8 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include "search_ranking.hpp"
+
 namespace {
 
 using json = nlohmann::json;
@@ -93,6 +95,24 @@ json postings_to_json(const std::vector<Internship>& items) {
     return arr;
 }
 
+// Same as postings_to_json, but also attaches a "relevance" score (0..1) per
+// item when a keyword query was given, so the frontend can render closeness
+// as layers instead of a flat list. `relevance` is `null` when there's no `q`.
+json search_results_to_json(const std::vector<Internship>& items,
+                             const std::optional<std::string>& q) {
+    std::optional<std::vector<std::string>> query_tokens;
+    if (q) query_tokens = ranking::tokenize(*q);
+
+    json arr = json::array();
+    for (const auto& item : items) {
+        json j = item.to_json();
+        j["relevance"] = query_tokens ? json(ranking::relevance_score(item, *query_tokens))
+                                       : json(nullptr);
+        arr.push_back(std::move(j));
+    }
+    return arr;
+}
+
 }  // namespace
 
 ApiServer::ApiServer(InternshipStore& store, std::string public_dir)
@@ -117,7 +137,8 @@ bool ApiServer::listen(const std::string& host, int port) {
             send_error(res, 400, error);
             return;
         }
-        res.set_content(postings_to_json(store_.search(*filters)).dump(), "application/json");
+        res.set_content(search_results_to_json(store_.search(*filters), filters->q).dump(),
+                        "application/json");
     });
 
     svr.Get(R"(/api/internships/([^/]+))", [this](const httplib::Request& req, httplib::Response& res) {

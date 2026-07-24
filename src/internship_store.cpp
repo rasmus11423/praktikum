@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "csv_parser.hpp"
+#include "search_ranking.hpp"
 
 namespace {
 
@@ -15,11 +16,6 @@ std::string to_lower(const std::string& s) {
     std::transform(out.begin(), out.end(), out.begin(),
                     [](unsigned char c) { return std::tolower(c); });
     return out;
-}
-
-bool contains_ci(const std::string& haystack, const std::string& needle) {
-    if (needle.empty()) return true;
-    return to_lower(haystack).find(to_lower(needle)) != std::string::npos;
 }
 
 std::vector<std::string> expected_header() {
@@ -96,11 +92,8 @@ std::optional<Internship> InternshipStore::find_by_id(const std::string& id) con
 std::vector<Internship> InternshipStore::search(const SearchFilters& filters) const {
     std::vector<Internship> results;
     for (const auto& item : items_) {
-        if (filters.q && !(contains_ci(item.name, *filters.q) ||
-                            contains_ci(item.company, *filters.q) ||
-                            contains_ci(item.description, *filters.q))) {
-            continue;
-        }
+        // Note: `q` is intentionally not a hard filter here — it only ranks
+        // results (see below). Everything else stays an exact include/exclude.
         if (filters.pay_specified && is_pay_specified(item.pay) != *filters.pay_specified) {
             continue;
         }
@@ -116,6 +109,16 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
         }
         results.push_back(item);
     }
+
+    if (filters.q) {
+        auto query_tokens = ranking::tokenize(*filters.q);
+        std::stable_sort(results.begin(), results.end(),
+                          [&](const Internship& a, const Internship& b) {
+                              return ranking::relevance_score(a, query_tokens) >
+                                     ranking::relevance_score(b, query_tokens);
+                          });
+    }
+
     return results;
 }
 
