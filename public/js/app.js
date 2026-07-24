@@ -1,11 +1,19 @@
 const form = document.getElementById("filters");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
+const moreFiltersToggle = document.getElementById("moreFiltersToggle");
+const moreFiltersPanel = document.getElementById("moreFiltersPanel");
 const tagFilterToggle = document.getElementById("tagFilterToggle");
 const tagFilterPanel = document.getElementById("tagFilterPanel");
 const tagFilterCount = document.getElementById("tagFilterCount");
 
 let selectedTags = new Set();
+let expandedIds = new Set();
+let favorites = new Set(JSON.parse(localStorage.getItem("favorites") || "[]"));
+
+function saveFavorites() {
+  localStorage.setItem("favorites", JSON.stringify([...favorites]));
+}
 
 function buildQuery() {
   const params = new URLSearchParams();
@@ -57,6 +65,10 @@ function relevanceBorderColor(relevance) {
   return `rgba(52, 87, 213, ${alpha})`;
 }
 
+// Renders a row plus its (initially collapsed) inline detail panel, kept as
+// a sibling rather than nested so it doesn't disturb the row's own flex
+// column layout. Expand state and favorite state both persist across
+// re-renders via the module-level Sets.
 function renderRow(item, queryTokens) {
   const payHtml = item.pay_specified
     ? highlight(item.pay, queryTokens)
@@ -74,12 +86,17 @@ function renderRow(item, queryTokens) {
     ? `<a class="row-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Vaata kuulutust →</a>`
     : "";
 
-  const titleText = item.tags.length
-    ? `${item.description}\n\nSildid: ${item.tags.join(", ")}`
-    : item.description;
+  const isFavorite = favorites.has(item.id);
+  const favHtml = `<button type="button" class="fav-btn${isFavorite ? " favorited" : ""}" data-id="${escapeHtml(item.id)}" aria-label="Lisa lemmikuks">${isFavorite ? "★" : "☆"}</button>`;
+
+  const isExpanded = expandedIds.has(item.id);
+  const tagChipsHtml = item.tags.length
+    ? item.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")
+    : `<span class="no-tags">Sildid puuduvad</span>`;
 
   return `
-    <div class="row" style="border-left-color: ${relevanceBorderColor(item.relevance)}" title="${escapeHtml(titleText)}">
+    <div class="row" data-id="${escapeHtml(item.id)}" style="border-left-color: ${relevanceBorderColor(item.relevance)}">
+      <span class="col-favorite">${favHtml}</span>
       <span class="col-relevance">${relevanceHtml}</span>
       <span class="col-name">${highlight(item.name, queryTokens)}</span>
       <span class="col-company">${highlight(item.company, queryTokens)}</span>
@@ -89,6 +106,14 @@ function renderRow(item, queryTokens) {
       <span class="col-deadline">${escapeHtml(item.deadline)}</span>
       <span class="col-description">${highlight(item.description, queryTokens)}</span>
       <span class="col-link">${linkHtml}</span>
+    </div>
+    <div class="row-details${isExpanded ? " expanded" : ""}" data-details-for="${escapeHtml(item.id)}">
+      <div class="row-details-inner">
+        <div class="row-details-content">
+          <p class="row-details-description">${highlight(item.description, queryTokens)}</p>
+          <div class="row-details-tags">${tagChipsHtml}</div>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -155,6 +180,39 @@ function renderSections(items, queryTokens) {
     .join("");
 }
 
+// Wires up per-row interactions after every re-render: clicking a row
+// toggles its inline detail panel, the favorite star toggles independently
+// (without also triggering expand), and the outbound link doesn't trigger
+// expand either.
+function attachRowInteractions() {
+  resultsEl.querySelectorAll(".row[data-id]").forEach((rowEl) => {
+    rowEl.addEventListener("click", () => {
+      const id = rowEl.dataset.id;
+      const details = resultsEl.querySelector(`.row-details[data-details-for="${id}"]`);
+      if (!details) return;
+      if (expandedIds.has(id)) expandedIds.delete(id);
+      else expandedIds.add(id);
+      details.classList.toggle("expanded");
+    });
+  });
+
+  resultsEl.querySelectorAll(".fav-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (favorites.has(id)) favorites.delete(id);
+      else favorites.add(id);
+      saveFavorites();
+      btn.classList.toggle("favorited", favorites.has(id));
+      btn.textContent = favorites.has(id) ? "★" : "☆";
+    });
+  });
+
+  resultsEl.querySelectorAll(".row-link").forEach((link) => {
+    link.addEventListener("click", (e) => e.stopPropagation());
+  });
+}
+
 // Renders the tag dropdown's checkbox list from live facet counts (how many
 // of the *current* results carry each tag), preserving which tags are
 // checked across re-renders.
@@ -209,6 +267,7 @@ async function runSearch() {
 
     statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
     resultsEl.innerHTML = renderSections(body, queryTokens);
+    attachRowInteractions();
 
     if (facetsRes.ok) {
       const facetsBody = await facetsRes.json();
@@ -239,28 +298,48 @@ async function populateEmploymentTypes() {
   }
 }
 
+function setupDropdown(toggle, panel) {
+  toggle.addEventListener("click", () => {
+    const opening = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden");
+    toggle.setAttribute("aria-expanded", String(opening));
+  });
+}
+
+setupDropdown(moreFiltersToggle, moreFiltersPanel);
+setupDropdown(tagFilterToggle, tagFilterPanel);
+
+document.addEventListener("click", (e) => {
+  for (const [toggle, panel] of [
+    [moreFiltersToggle, moreFiltersPanel],
+    [tagFilterToggle, tagFilterPanel],
+  ]) {
+    if (panel.classList.contains("hidden")) continue;
+    if (panel.contains(e.target) || toggle.contains(e.target)) continue;
+    panel.classList.add("hidden");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+});
+
+// No submit button anymore — Enter in the search box still submits the
+// form, so this stays as the handler for that; every other control runs
+// the search itself as soon as it changes.
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   runSearch();
 });
 
-document.getElementById("reset").addEventListener("click", () => {
-  form.reset();
-  selectedTags.clear();
-  runSearch();
+let searchDebounce;
+form.q.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runSearch, 250);
 });
 
-tagFilterToggle.addEventListener("click", () => {
-  const opening = tagFilterPanel.classList.contains("hidden");
-  tagFilterPanel.classList.toggle("hidden");
-  tagFilterToggle.setAttribute("aria-expanded", String(opening));
-});
-
-document.addEventListener("click", (e) => {
-  if (tagFilterPanel.classList.contains("hidden")) return;
-  if (tagFilterPanel.contains(e.target) || tagFilterToggle.contains(e.target)) return;
-  tagFilterPanel.classList.add("hidden");
-  tagFilterToggle.setAttribute("aria-expanded", "false");
-});
+for (const radio of form.querySelectorAll('input[name="pay_specified"]')) {
+  radio.addEventListener("change", runSearch);
+}
+form.type.addEventListener("change", runSearch);
+form.deadline_after.addEventListener("change", runSearch);
+form.deadline_before.addEventListener("change", runSearch);
 
 populateEmploymentTypes().then(runSearch);

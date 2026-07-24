@@ -13,43 +13,46 @@
   </header>
 
   <main>
-    <form id="filters">
-      <input type="search" id="q" name="q" placeholder="Otsi pealkirja, ettevõtte või kirjelduse järgi…">
+    <form id="filters" class="search-bar">
+      <div class="dropdown">
+        <button type="button" id="moreFiltersToggle" class="dropdown-toggle" aria-expanded="false">Filtrid ▾</button>
+        <div id="moreFiltersPanel" class="dropdown-panel hidden">
+          <fieldset>
+            <legend>Tasu</legend>
+            <label><input type="radio" name="pay_specified" value="" checked> Kõik</label>
+            <label><input type="radio" name="pay_specified" value="true"> Tasu märgitud</label>
+            <label><input type="radio" name="pay_specified" value="false"> Pole märgitud</label>
+          </fieldset>
 
-      <fieldset>
-        <legend>Tasu</legend>
-        <label><input type="radio" name="pay_specified" value="" checked> Kõik</label>
-        <label><input type="radio" name="pay_specified" value="true"> Tasu märgitud</label>
-        <label><input type="radio" name="pay_specified" value="false"> Pole märgitud</label>
-      </fieldset>
+          <fieldset>
+            <legend>Tööaeg</legend>
+            <select id="type" name="type">
+              <option value="">Kõik</option>
+            </select>
+          </fieldset>
 
-      <fieldset>
-        <legend>Tööaeg</legend>
-        <select id="type" name="type">
-          <option value="">Kõik</option>
-        </select>
-      </fieldset>
-
-      <fieldset>
-        <legend>Tähtaeg</legend>
-        <label>Alates <input type="date" id="deadline_after" name="deadline_after"></label>
-        <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
-      </fieldset>
-
-      <div class="tag-filter">
-        <button type="button" id="tagFilterToggle" class="tag-filter-toggle" aria-expanded="false">
-          Sildid<span id="tagFilterCount"></span> ▾
-        </button>
-        <div id="tagFilterPanel" class="tag-filter-panel hidden"></div>
+          <fieldset>
+            <legend>Tähtaeg</legend>
+            <label>Alates <input type="date" id="deadline_after" name="deadline_after"></label>
+            <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
+          </fieldset>
+        </div>
       </div>
 
-      <button type="submit">Otsi</button>
-      <button type="button" id="reset">Lähtesta</button>
+      <input type="search" id="q" name="q" class="search-input" placeholder="Otsi praktikakohti — pealkiri, ettevõte, kirjeldus…" autocomplete="off">
+
+      <div class="dropdown">
+        <button type="button" id="tagFilterToggle" class="dropdown-toggle" aria-expanded="false">
+          Sildid<span id="tagFilterCount"></span> ▾
+        </button>
+        <div id="tagFilterPanel" class="dropdown-panel dropdown-panel-right hidden"></div>
+      </div>
     </form>
 
     <p id="status"></p>
 
     <div class="row row-header">
+      <span class="col-favorite"></span>
       <span class="col-relevance"></span>
       <span class="col-name">Nimi</span>
       <span class="col-company">Ettevõte</span>

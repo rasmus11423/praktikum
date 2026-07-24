@@ -18,51 +18,74 @@ body {
 header h1 { margin-bottom: 0.2rem; font-size: 1.5rem; }
 .subtitle { color: var(--muted); margin-top: 0; }
 
-#filters {
+/* Search bar: the search input is the dominant element, with a filter
+   dropdown flanking each side rather than a row of separate controls. */
+.search-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-end;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
-#q {
-  flex: 1 1 220px;
-  padding: 0.5rem;
-  font-size: 1rem;
+.search-input {
+  flex: 1 1 auto;
+  padding: 0.9rem 1.2rem;
+  font-size: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  outline: none;
+  background: Canvas;
+  color: CanvasText;
+}
+.search-input:focus { border-color: var(--accent); }
+
+.dropdown { position: relative; flex: 0 0 auto; }
+
+.dropdown-toggle {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-fieldset {
+#tagFilterCount { font-weight: 600; }
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 10;
+  min-width: 260px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+.dropdown-panel.hidden { display: none; }
+.dropdown-panel-right { left: auto; right: 0; }
+
+#moreFiltersPanel fieldset {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
+  margin-bottom: 0.6rem;
 }
-
-legend { font-size: 0.8rem; color: var(--muted); padding: 0 0.3rem; }
-
-fieldset label { margin-right: 0.6rem; font-size: 0.9rem; white-space: nowrap; }
-
-button {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
-  font-size: 0.95rem;
-}
-
-button#reset {
-  background: transparent;
-  color: var(--accent);
-}
+#moreFiltersPanel fieldset:last-child { margin-bottom: 0; }
+#moreFiltersPanel legend { font-size: 0.8rem; color: var(--muted); padding: 0 0.3rem; }
+#moreFiltersPanel fieldset label { display: block; margin: 0.25rem 0; font-size: 0.9rem; white-space: nowrap; }
 
 #status { color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
 
-/* Results: a vertical stack of full-width, single-line rows (no card grid). */
+/* Results: a vertical stack of full-width, single-line rows (no card grid).
+   Each row is clickable to expand its full description inline. */
 #results {
   display: flex;
   flex-direction: column;
@@ -82,13 +105,39 @@ button#reset {
   white-space: nowrap;
 }
 
+.row:not(.row-header) { cursor: pointer; }
+.row:not(.row-header):hover { background: rgba(52, 87, 213, 0.06); }
+
 .row > * {
   min-width: 0;               /* required for text-overflow to work inside flex items */
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.row:last-child { border-bottom: none; }
+/* Inline expansion panel shown below a clicked row, animated via the
+   grid-template-rows 0fr/1fr trick (no JS height measuring needed). */
+.row-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease;
+  background: rgba(52, 87, 213, 0.04);
+}
+.row-details.expanded {
+  grid-template-rows: 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.row-details-inner { overflow: hidden; }
+.row-details-content { padding: 0.75rem 1rem; }
+.row-details-description { margin: 0 0 0.6rem; font-size: 0.9rem; white-space: normal; }
+.row-details-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.tag-chip {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(52, 87, 213, 0.12);
+  color: var(--accent);
+}
 
 /* Sectioned results: relevance tiers when a query is active, or tag groups
    when browsing without one. Each section is just a labeled run of .row. */
@@ -128,6 +177,7 @@ details.result-section[open] > summary.section-header::before {
   border-bottom: none;
 }
 
+.col-favorite { flex: 0 0 1.6rem; text-align: center; }
 .col-relevance { flex: 0 0 3.2rem; text-align: center; font-size: 0.75rem; color: var(--accent); font-variant-numeric: tabular-nums; }
 .col-name { flex: 0 0 240px; font-weight: 600; }
 .col-company { flex: 0 0 180px; color: var(--muted); }
@@ -141,38 +191,16 @@ details.result-section[open] > summary.section-header::before {
 .pay-unspecified { color: var(--muted); font-style: italic; }
 .no-tags { opacity: 0.5; }
 
-/* Tag filter: a toggle button that opens a checkbox panel with live facet
-   counts (how many current results carry each tag). */
-.tag-filter { position: relative; }
-
-.tag-filter-toggle {
-  background: transparent;
-  color: var(--accent);
-  font-size: 0.9rem;
-  padding: 0.5rem 0.9rem;
+.fav-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
 }
-
-#tagFilterCount {
-  font-weight: 600;
-}
-
-.tag-filter-panel {
-  position: absolute;
-  bottom: calc(100% + 0.4rem);
-  left: 0;
-  z-index: 10;
-  min-width: 260px;
-  max-height: 320px;
-  overflow-y: auto;
-  background: Canvas;
-  color: CanvasText;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.5rem;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-}
-
-.tag-filter-panel.hidden { display: none; }
+.fav-btn.favorited { color: #d99a00; }
 
 .tag-option {
   display: flex;

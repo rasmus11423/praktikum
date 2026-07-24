@@ -243,9 +243,16 @@ The CSV is loaded once at startup. Swap the file and restart the server to pick 
 
 ## Test frontend
 
-`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, a "Tähtaeg" (deadline) date range, and a "Sildid" (tags) dropdown — a checkbox panel showing every tag with a live count of how many current results carry it (from `/api/facets`), refetched on every filter change so the counts stay accurate as you narrow down.
+`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search. The search box is the dominant, centered element; filters live in two dropdowns flanking it rather than a row of separate controls:
 
-Results render as a single-line horizontal row per posting (not a card grid) — relevance badge, name, company, pay, employment type, tags, deadline, a truncated description (full text + tags on hover), and a link out to the original posting. When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
+- **Filtrid** (left): the "Tasu" pay filter (Kõik / Tasu märgitud / Pole märgitud), the "Tööaeg" dropdown (populated dynamically from the loaded data), and a "Tähtaeg" deadline range — all consolidated into one panel.
+- **Sildid** (right): the tag checkbox panel with live facet counts, unchanged from before except it now opens downward instead of upward.
+
+There's no "Otsi"/"Lähtesta" button anymore — search runs automatically: the search box re-searches on a short debounce as you type, every other control re-searches immediately on change, and pressing Enter in the search box still works too (the `<form>` submit handler is still there, just without a visible button).
+
+Results render as a single-line horizontal row per posting (not a card grid) — a favorite-star toggle, relevance badge, name, company, pay, employment type, tags, deadline, a truncated description, and a link out to the original posting. Clicking anywhere on a row (other than the star or the outbound link) expands an inline panel below it with the full description and tag chips — a CSS grid-based collapse/expand animation, no layout-measuring JS needed. The favorite star persists to `localStorage`, so favorited postings survive a page reload; there's no dedicated "favorites only" filter yet, just the per-row toggle.
+
+When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
 
 Rows are also grouped into sections, computed client-side in `public/js/app.js` from the `relevance`/`tags` already in each `/api/search` result — no extra backend call:
 
