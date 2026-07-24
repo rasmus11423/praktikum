@@ -1,46 +1,43 @@
 <!doctype html>
-<html lang="en">
+<html lang="et">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Internship Search (test frontend)</title>
+  <title>Praktikakohtade otsing (testkeskkond)</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header>
-    <h1>Internship Search — test harness</h1>
-    <p class="subtitle">Minimal frontend for manually exercising the search/filter API.</p>
+    <h1>Praktikakohtade otsing — testkeskkond</h1>
+    <p class="subtitle">Minimalistlik liides otsingu ja filtrite käsitsi testimiseks.</p>
   </header>
 
   <main>
     <form id="filters">
-      <input type="search" id="q" name="q" placeholder="Search title, company, description…">
+      <input type="search" id="q" name="q" placeholder="Otsi pealkirja, ettevõtte või kirjelduse järgi…">
 
       <fieldset>
-        <legend>Paid</legend>
-        <label><input type="radio" name="paid" value="" checked> Any</label>
-        <label><input type="radio" name="paid" value="true"> Paid</label>
-        <label><input type="radio" name="paid" value="false"> Unpaid</label>
+        <legend>Tasu</legend>
+        <label><input type="radio" name="pay_specified" value="" checked> Kõik</label>
+        <label><input type="radio" name="pay_specified" value="true"> Tasu märgitud</label>
+        <label><input type="radio" name="pay_specified" value="false"> Pole märgitud</label>
       </fieldset>
 
       <fieldset>
-        <legend>Employment type</legend>
+        <legend>Tööaeg</legend>
         <select id="type" name="type">
-          <option value="">Any</option>
-          <option value="part-time">Part-time</option>
-          <option value="full-time">Full-time</option>
-          <option value="contract">Contract</option>
+          <option value="">Kõik</option>
         </select>
       </fieldset>
 
       <fieldset>
-        <legend>Deadline range</legend>
-        <label>After <input type="date" id="deadline_after" name="deadline_after"></label>
-        <label>Before <input type="date" id="deadline_before" name="deadline_before"></label>
+        <legend>Tähtaeg</legend>
+        <label>Alates <input type="date" id="deadline_after" name="deadline_after"></label>
+        <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
       </fieldset>
 
-      <button type="submit">Search</button>
-      <button type="button" id="reset">Reset</button>
+      <button type="submit">Otsi</button>
+      <button type="button" id="reset">Lähtesta</button>
     </form>
 
     <p id="status"></p>

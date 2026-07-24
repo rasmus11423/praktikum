@@ -85,7 +85,16 @@ button#reset {
   background: rgba(52, 87, 213, 0.1);
   color: var(--accent);
 }
-.tag.unpaid { background: rgba(107, 114, 128, 0.15); color: var(--muted); }
+.tag.unspecified { background: rgba(107, 114, 128, 0.15); color: var(--muted); }
+
+.card-link {
+  display: inline-block;
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+.card-link:hover { text-decoration: underline; }
 
 @media (prefers-color-scheme: dark) {
   :root { --border: #3a3f4b; --muted: #9aa1ad; }

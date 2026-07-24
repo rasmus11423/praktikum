@@ -1,6 +1,9 @@
 #include "api_server.hpp"
 
 #include <algorithm>
+#include <string>
+#include <vector>
+
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
@@ -13,16 +16,26 @@ void send_error(httplib::Response& res, int status, const std::string& message) 
     res.set_content(json{{"error", message}}.dump(), "application/json");
 }
 
-bool is_valid_employment_type(const std::string& raw) {
-    std::string lower = raw;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
+std::string to_lower(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
                     [](unsigned char c) { return std::tolower(c); });
-    return lower == "part-time" || lower == "full-time" || lower == "contract";
+    return out;
+}
+
+std::string join(const std::vector<std::string>& values, const std::string& sep) {
+    std::string out;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i) out += sep;
+        out += values[i];
+    }
+    return out;
 }
 
 // Parses and validates query params into a SearchFilters. On failure, sets
 // `error` to a human-readable message and returns std::nullopt.
 std::optional<SearchFilters> parse_filters(const httplib::Request& req,
+                                            const InternshipStore& store,
                                             std::string& error) {
     SearchFilters filters;
 
@@ -30,25 +43,27 @@ std::optional<SearchFilters> parse_filters(const httplib::Request& req,
         filters.q = req.get_param_value("q");
     }
 
-    if (req.has_param("paid")) {
-        std::string raw = req.get_param_value("paid");
-        std::string lower = raw;
-        std::transform(lower.begin(), lower.end(), lower.begin(),
-                        [](unsigned char c) { return std::tolower(c); });
+    if (req.has_param("pay_specified")) {
+        std::string lower = to_lower(req.get_param_value("pay_specified"));
         if (lower != "true" && lower != "false") {
-            error = "Invalid 'paid' value: must be 'true' or 'false'";
+            error = "Invalid 'pay_specified' value: must be 'true' or 'false'";
             return std::nullopt;
         }
-        filters.paid = (lower == "true");
+        filters.pay_specified = (lower == "true");
     }
 
     if (req.has_param("type")) {
         std::string raw = req.get_param_value("type");
-        if (!is_valid_employment_type(raw)) {
-            error = "Invalid 'type' value: must be one of part-time, full-time, contract";
+        std::string lower_raw = to_lower(raw);
+        auto types = store.distinct_employment_types();
+        auto match = std::find_if(types.begin(), types.end(), [&](const std::string& t) {
+            return to_lower(t) == lower_raw;
+        });
+        if (match == types.end()) {
+            error = "Invalid 'type' value: must be one of " + join(types, ", ");
             return std::nullopt;
         }
-        filters.employment_type = raw;
+        filters.employment_type = *match;
     }
 
     if (req.has_param("deadline_before")) {
@@ -97,7 +112,7 @@ bool ApiServer::listen(const std::string& host, int port) {
 
     svr.Get("/api/search", [this](const httplib::Request& req, httplib::Response& res) {
         std::string error;
-        auto filters = parse_filters(req, error);
+        auto filters = parse_filters(req, store_, error);
         if (!filters) {
             send_error(res, 400, error);
             return;

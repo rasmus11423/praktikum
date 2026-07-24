@@ -86,21 +86,42 @@ docker run --rm -p 8080:8080 -v "$(pwd)/data:/app/data:ro" internship-server
 
 ## API
 
+The data (and the test frontend) is in Estonian, but JSON keys stay in
+English for a stable API contract — see the field list below.
+
 ### `GET /api/internships`
-Returns all postings as a JSON array.
+Returns all postings as a JSON array. Each item looks like:
+
+```json
+{
+  "id": "1",
+  "name": "Panganduspraktikant (Kick Start Your Career)",
+  "company": "Swedbank Estonia",
+  "description": "Rootsi päritolu suurpanga iga-aastane suvepraktika…",
+  "pay": "1000-1500 €/kuus (bruto)",
+  "pay_specified": true,
+  "employment_type": "täiskoormusega",
+  "deadline": "2026-04-30",
+  "link": "https://www.swedbank.com/work-with-us/kick-start-your-career/et.html"
+}
+```
+
+`pay_specified` is derived server-side: `false` when `pay` is the CSV's
+"Pole märgitud" (not specified) placeholder or empty, `true` otherwise. There's
+no separate paid/unpaid boolean in the data — see `pay_specified` below.
 
 ### `GET /api/search`
 Query params (all optional, combinable):
 
 | param             | example        | notes                                              |
 |-------------------|----------------|-----------------------------------------------------|
-| `q`                | `q=engineering` | case-insensitive substring match on name, company, description |
-| `paid`             | `paid=true`     | `true` or `false`                                  |
-| `type`             | `type=full-time`| `part-time`, `full-time`, or `contract`            |
+| `q`                | `q=panga` | case-insensitive substring match on name, company, description |
+| `pay_specified`    | `pay_specified=true` | `true` or `false` — whether `pay` lists an actual amount vs. "Pole märgitud" |
+| `type`             | `type=täiskoormusega`| must match one of the `employment_type` values actually present in the data (currently `täiskoormusega`, `tähtajaline`) — validated dynamically, not hardcoded |
 | `deadline_after`   | `deadline_after=2026-09-01` | ISO date, inclusive lower bound        |
 | `deadline_before`  | `deadline_before=2026-09-30`| ISO date, inclusive upper bound        |
 
-Invalid values (e.g. `paid=maybe`, a malformed date) return `400` with a JSON `{"error": "..."}` body.
+Invalid values (e.g. `pay_specified=maybe`, an unknown `type`, a malformed date) return `400` with a JSON `{"error": "..."}` body — the `type` error message lists the currently valid values.
 
 ### `GET /api/internships/:id`
 Returns a single posting, or `404` with a JSON error body if the id doesn't exist.
@@ -111,24 +132,28 @@ Returns a single posting, or `404` with a JSON error body if the id doesn't exis
 # All postings
 curl http://localhost:8080/api/internships
 
-# Keyword search
-curl "http://localhost:8080/api/search?q=data"
+# Keyword search (Estonian text; URL-encode non-ASCII characters)
+curl -G "http://localhost:8080/api/search" --data-urlencode "q=panga"
 
-# Paid, full-time only
-curl "http://localhost:8080/api/search?paid=true&type=full-time"
+# Only postings with an actual pay amount listed
+curl "http://localhost:8080/api/search?pay_specified=true"
+
+# Full-time only
+curl -G "http://localhost:8080/api/search" --data-urlencode "type=täiskoormusega"
 
 # Deadline window
 curl "http://localhost:8080/api/search?deadline_after=2026-09-01&deadline_before=2026-09-30"
 
 # Combined filters
-curl "http://localhost:8080/api/search?q=intern&paid=true&type=contract"
+curl -G "http://localhost:8080/api/search" --data-urlencode "q=praktikant" -d "pay_specified=true" --data-urlencode "type=tähtajaline"
 
 # Single posting
 curl http://localhost:8080/api/internships/5
 
 # Error cases
-curl -i "http://localhost:8080/api/search?paid=maybe"     # 400
-curl -i http://localhost:8080/api/internships/does-not-exist  # 404
+curl -i "http://localhost:8080/api/search?pay_specified=maybe"   # 400
+curl -i "http://localhost:8080/api/search?type=bogus"            # 400, lists valid types
+curl -i http://localhost:8080/api/internships/does-not-exist     # 404
 ```
 
 ## Data
@@ -136,16 +161,17 @@ curl -i http://localhost:8080/api/internships/does-not-exist  # 404
 `data/internships.csv` has one row per posting with columns:
 
 ```
-id,name,company,description,paid,pay,employment_type,deadline
+id,nimi,ettevõte,kirjeldus,tasu,tööaeg,tähtaeg,link
 ```
 
-- `paid`: `true`/`false`
-- `pay`: free-text amount/range (e.g. `$25/hr`), empty if unpaid
-- `employment_type`: `part-time`, `full-time`, or `contract`
-- `deadline`: ISO date, `YYYY-MM-DD`
+- `nimi` → `name`, `ettevõte` → `company`, `kirjeldus` → `description`
+- `tasu` → `pay`: free-text compensation info, or the literal `Pole märgitud` when not specified (the API derives `pay_specified` from this)
+- `tööaeg` → `employment_type`: free-text employment type (e.g. `täiskoormusega`, `tähtajaline`) — the backend doesn't hardcode an enum, it validates `type` search params and populates the frontend dropdown from whatever values are actually present in the CSV
+- `tähtaeg` → `deadline`: ISO date, `YYYY-MM-DD`
+- `link` → `link`: URL to the original posting
 
-The CSV is loaded once at startup. Swap the file and restart the server to pick up changes — there's no database yet.
+The CSV is loaded once at startup. Swap the file and restart the server to pick up changes — there's no database yet. The header row must match the Estonian column names above exactly.
 
 ## Test frontend
 
-`public/index.html` + `public/js/app.js` is a plain-JS (no framework) page for manually exercising search: a keyword box, paid/unpaid radio filter, employment type dropdown, and a deadline date range, rendering results as cards. It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.
+`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, and a "Tähtaeg" (deadline) date range, rendering results as cards with a link out to the original posting. It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.

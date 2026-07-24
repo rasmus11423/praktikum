@@ -22,13 +22,9 @@ bool contains_ci(const std::string& haystack, const std::string& needle) {
     return to_lower(haystack).find(to_lower(needle)) != std::string::npos;
 }
 
-bool parse_bool(const std::string& raw) {
-    return to_lower(raw) == "true" || raw == "1";
-}
-
 std::vector<std::string> expected_header() {
-    return {"id", "name", "company", "description", "paid",
-            "pay", "employment_type", "deadline"};
+    return {"id", "nimi", "ettevõte", "kirjeldus", "tasu",
+            "tööaeg", "tähtaeg", "link"};
 }
 
 }  // namespace
@@ -60,8 +56,8 @@ void InternshipStore::load_from_file(const std::string& path) {
     const auto& header = rows.front();
     if (header != expected_header()) {
         throw std::runtime_error(
-            "Data file has unexpected header (expected id,name,company,"
-            "description,paid,pay,employment_type,deadline): " + path);
+            "Data file has unexpected header (expected id,nimi,ettevõte,"
+            "kirjeldus,tasu,tööaeg,tähtaeg,link): " + path);
     }
 
     std::vector<Internship> loaded;
@@ -80,10 +76,10 @@ void InternshipStore::load_from_file(const std::string& path) {
         item.name = row[1];
         item.company = row[2];
         item.description = row[3];
-        item.paid = parse_bool(row[4]);
-        item.pay = row[5];
-        item.employment_type = row[6];
-        item.deadline = row[7];
+        item.pay = row[4];
+        item.employment_type = row[5];
+        item.deadline = row[6];
+        item.link = row[7];
         loaded.push_back(std::move(item));
     }
 
@@ -105,7 +101,7 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
                             contains_ci(item.description, *filters.q))) {
             continue;
         }
-        if (filters.paid && item.paid != *filters.paid) {
+        if (filters.pay_specified && is_pay_specified(item.pay) != *filters.pay_specified) {
             continue;
         }
         if (filters.employment_type &&
@@ -121,4 +117,15 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
         results.push_back(item);
     }
     return results;
+}
+
+std::vector<std::string> InternshipStore::distinct_employment_types() const {
+    std::vector<std::string> types;
+    for (const auto& item : items_) {
+        if (std::find(types.begin(), types.end(), item.employment_type) == types.end()) {
+            types.push_back(item.employment_type);
+        }
+    }
+    std::sort(types.begin(), types.end());
+    return types;
 }

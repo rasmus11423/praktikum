@@ -8,7 +8,7 @@
 
 struct SearchFilters {
     std::optional<std::string> q;                  // keyword, matched case-insensitively
-    std::optional<bool> paid;                       // exact match on paid flag
+    std::optional<bool> pay_specified;               // whether "tasu" lists an actual amount
     std::optional<std::string> employment_type;      // exact match, case-insensitive
     std::optional<std::string> deadline_before;      // ISO date, inclusive upper bound
     std::optional<std::string> deadline_after;        // ISO date, inclusive lower bound
@@ -32,6 +32,11 @@ public:
     std::optional<Internship> find_by_id(const std::string& id) const;
 
     std::vector<Internship> search(const SearchFilters& filters) const;
+
+    // Unique "tööaeg" (employment type) values present in the loaded data,
+    // sorted. Used to validate the `type` query param and to populate the
+    // frontend's filter dropdown without hardcoding an enum.
+    std::vector<std::string> distinct_employment_types() const;
 
 private:
     std::vector<Internship> items_;
