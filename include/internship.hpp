@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -30,6 +31,7 @@ struct Internship {
     std::string employment_type;  // e.g. "täiskoormusega", "tähtajaline"
     std::string deadline;         // ISO date, YYYY-MM-DD
     std::string link;             // URL to the original posting
+    std::vector<std::string> tags;  // computed at load time, see tagging.hpp
 
     nlohmann::json to_json() const {
         return nlohmann::json{
@@ -42,6 +44,7 @@ struct Internship {
             {"employment_type", employment_type},
             {"deadline", deadline},
             {"link", link},
+            {"tags", tags},
         };
     }
 };

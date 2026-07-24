@@ -8,6 +8,7 @@
 
 #include "csv_parser.hpp"
 #include "search_ranking.hpp"
+#include "tagging.hpp"
 
 namespace {
 
@@ -76,6 +77,7 @@ void InternshipStore::load_from_file(const std::string& path) {
         item.employment_type = row[5];
         item.deadline = row[6];
         item.link = row[7];
+        item.tags = tagging::tags_for(item);
         loaded.push_back(std::move(item));
     }
 

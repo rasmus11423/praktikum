@@ -102,7 +102,8 @@ Returns all postings as a JSON array. Each item looks like:
   "pay_specified": true,
   "employment_type": "täiskoormusega",
   "deadline": "2026-04-30",
-  "link": "https://www.swedbank.com/work-with-us/kick-start-your-career/et.html"
+  "link": "https://www.swedbank.com/work-with-us/kick-start-your-career/et.html",
+  "tags": ["Pangandus ja rahandus"]
 }
 ```
 
@@ -145,6 +146,24 @@ include/exclude filters). Each result gets a `"relevance"` field in `[0, 1]`
 There's no semantic/synonym understanding here — "closeness" is purely
 lexical (shared characters/substrings), not conceptual. Implementation is in
 `include/search_ranking.hpp` / `src/search_ranking.cpp`.
+
+#### Tags
+
+Every posting also gets a `"tags"` array (e.g. `["Tarkvaraarendus", "Andmeteadus ja analüütika"]`,
+possibly empty), computed once at load time in `include/tagging.hpp` /
+`src/tagging.cpp`. It's a small rule-based dictionary — about 15 categories
+(banking, software, data, marketing, HR, design, cybersecurity, engineering,
+robotics, legal, sales, logistics, public sector, product, telecom), each
+firing when one of its trigger keywords shows up in the posting's name,
+company, or description. Matching is done against word tokens (equal to, or
+a prefix of, the keyword) rather than a raw substring search, specifically to
+avoid one word accidentally matching inside an unrelated compound word (e.g.
+without that, `kommunikatsioon` would wrongly fire inside `telekommunikatsiooniandmeid`).
+It's not a classifier and has no ML/training step — it's approximate and will
+need occasional keyword tuning as new postings introduce vocabulary it
+doesn't cover (currently one posting in the sample data ends up with no tags
+at all, which is an expected gap, not a bug). There's no `tags` search/filter
+param yet — this first pass only makes tags visible on each result.
 
 ### `GET /api/internships/:id`
 Returns a single posting, or `404` with a JSON error body if the id doesn't exist.
@@ -199,6 +218,6 @@ The CSV is loaded once at startup. Swap the file and restart the server to pick 
 
 `public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search: a keyword box, a "Tasu" (pay) filter (Kõik / Tasu märgitud / Pole märgitud), a "Tööaeg" dropdown populated dynamically from the loaded data, and a "Tähtaeg" (deadline) date range.
 
-Results render as a single-line horizontal row per posting (not a card grid) — name, company, pay, employment type, deadline, a truncated description (full text on hover), and a link out to the original posting. When a keyword search is active, each row also gets a percentage badge and a left-edge color tint proportional to its `relevance` score, so closeness reads as layers at a glance instead of a flat list.
+Results render as a single-line horizontal row per posting (not a card grid) — relevance badge, name, company, pay, employment type, tags, deadline, a truncated description (full text + tags on hover), and a link out to the original posting. When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
 
 It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.
