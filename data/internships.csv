@@ -1,0 +1,41 @@
+id,name,company,description,paid,pay,employment_type,deadline
+1,Software Engineering Intern,TechNova Solutions,"Work with a small backend team building REST APIs for a logistics platform, using Java and PostgreSQL.",true,$30/hr,full-time,2026-08-15
+2,Marketing Intern,BrightWave Media,"Support campaign planning and social copywriting for consumer brand clients, with weekly performance reporting.",true,$18/hr,part-time,2026-08-01
+3,Data Science Intern,Quantix Analytics,"Build churn-prediction models and dashboards for retail clients using Python and scikit-learn.",true,$35/hr,full-time,2026-09-10
+4,UX Design Intern,PixelCraft Studio,"Assist senior designers with wireframes, prototypes, and usability testing for a mobile banking app.",true,$22/hr,part-time,2026-08-20
+5,Finance Intern,Meridian Capital Partners,"Support the analyst team with financial modeling, market research, and quarterly investor reports.",true,$28/hr,full-time,2026-09-01
+6,Content Writing Intern,StoryLoom Publishing,"Draft blog posts, newsletters, and short-form scripts for an online education publisher.",false,,part-time,2026-08-05
+7,Mechanical Engineering Intern,Orbital Dynamics Aerospace,"Assist with structural testing and CAD design for small satellite propulsion components.",true,$27/hr,full-time,2026-10-01
+8,HR Intern,PeopleFirst HR Solutions,"Support recruiting coordination, onboarding paperwork, and employee engagement surveys.",false,,part-time,2026-08-12
+9,Backend Developer Intern,CloudForge Systems,"Build and test microservices for an internal DevOps tooling platform in Go and Docker.",true,$32/hr,contract,2026-09-15
+10,Graphic Design Intern,InkWell Creative Agency,"Create branding assets, social templates, and print layouts for small-business clients.",true,$17/hr,part-time,2026-08-08
+11,Legal Intern,Harrington & Cole LLP,"Assist attorneys with case research, document review, and client intake for corporate law cases.",false,,part-time,2026-09-20
+12,Environmental Science Intern,GreenPath Ecology Group,"Collect and analyze water-quality samples for a regional river restoration project.",true,$20/hr,full-time,2026-10-15
+13,Product Management Intern,Nimbus App Works,"Work with engineering and design to define feature requirements for a productivity app.",true,$33/hr,full-time,2026-09-05
+14,Sales Development Intern,Vertex Outreach Co,"Qualify inbound leads and support the sales team with CRM data hygiene and outreach sequences.",true,$19/hr,full-time,2026-08-25
+15,Cybersecurity Intern,Sentinel Shield Security,"Support vulnerability scanning, log analysis, and incident response tabletop exercises.",true,$34/hr,full-time,2026-09-30
+16,Social Media Intern,Trendify Social,"Plan and schedule content calendars, and track engagement metrics across client accounts.",true,$16/hr,part-time,2026-08-10
+17,Biomedical Research Intern,Helix Biomed Labs,"Assist with cell culture experiments and data logging for an early-stage diagnostics research team.",true,$24/hr,full-time,2026-10-05
+18,Accounting Intern,Ledger & Co Accounting,"Support bookkeeping, invoice reconciliation, and tax prep during the busy season.",true,$21/hr,part-time,2026-08-18
+19,Game Development Intern,PixelForge Games Studio,"Prototype gameplay mechanics and fix bugs for an indie mobile puzzle game in Unity.",true,$29/hr,contract,2026-09-25
+20,Architecture Intern,Bluestone Architecture Group,"Assist with 3D modeling and site documentation for residential and small commercial projects.",false,,part-time,2026-08-14
+21,Supply Chain Intern,LogiChain Solutions,"Analyze shipment data and support vendor coordination for a regional distribution network.",true,$23/hr,full-time,2026-10-10
+22,Journalism Intern,The Daily Signal,"Report on local community events and assist editors with fact-checking and copyediting.",false,,part-time,2026-08-22
+23,AI Research Intern,NeuralArc AI Research,"Support experiments on small language model fine-tuning and evaluation pipelines.",true,$38/hr,full-time,2026-11-01
+24,Real Estate Intern,Coastal Realty Group,"Assist agents with listing preparation, market comps, and open-house logistics.",true,$18/hr,part-time,2026-08-28
+25,Agricultural Operations Intern,FreshFarm Cooperative,"Support crop yield tracking and logistics scheduling for a regional farming cooperative.",true,$17/hr,full-time,2026-09-12
+26,Renewable Energy Intern,Solstice Energy Partners,"Assist engineers with performance monitoring of solar installations and reporting dashboards.",true,$26/hr,full-time,2026-10-20
+27,Motorsports Engineering Intern,Velocity Motorsports,"Support the race engineering team with telemetry data analysis and pit-stop logistics.",true,$25/hr,contract,2026-09-18
+28,Retail Operations Intern,Bloom & Petal Floristry,"Help manage inventory, seasonal order planning, and customer service for a small flower shop chain.",false,,part-time,2026-08-06
+29,Aviation Operations Intern,Horizon Airlines,"Support ground operations scheduling and customer service analytics at a regional airline hub.",true,$20/hr,full-time,2026-10-25
+30,Hospitality Management Intern,Cafe Lumiere Hospitality Group,"Rotate through front-of-house, events, and back-office operations at a boutique cafe chain.",true,$16/hr,part-time,2026-08-16
+31,Logistics Intern,Northwind Logistics,"Support route optimization analysis and warehouse inventory audits.",true,$22/hr,full-time,2026-09-22
+32,Fashion Design Intern,Stitch & Seam Fashion House,"Assist designers with pattern drafting, fabric sourcing, and lookbook photoshoots.",false,,part-time,2026-08-30
+33,Manufacturing Engineering Intern,Ironclad Manufacturing,"Support process improvement projects and quality control audits on the factory floor.",true,$24/hr,full-time,2026-11-05
+34,Community Outreach Intern,Riverside Community Nonprofit,"Support volunteer coordination and grant-writing for local youth mentorship programs.",false,,part-time,2026-08-19
+35,Education Technology Intern,BrightPath Tutoring & Education,"Help build interactive lesson content and track student progress in a tutoring platform.",true,$19/hr,part-time,2026-09-08
+36,Sports Analytics Intern,Apex Sports Management,"Analyze player performance data and build scouting reports for a regional sports agency.",true,$23/hr,contract,2026-10-30
+37,Wealth Management Intern,Lighthouse Financial Advisors,"Support client onboarding, portfolio reporting, and compliance documentation.",true,$27/hr,full-time,2026-09-28
+38,Construction Project Intern,Pinnacle Construction Group,"Assist project managers with scheduling, permits tracking, and site safety inspections.",true,$21/hr,full-time,2026-11-10
+39,Audio Engineering Intern,Wavelength Audio Engineering,"Support studio session setup, mixing sessions, and equipment maintenance for a recording studio.",true,$18/hr,contract,2026-09-14
+40,AgTech Data Intern,Terra Firma Agritech,"Build data pipelines for soil-sensor telemetry feeding into a precision agriculture platform.",true,$26/hr,full-time,2026-12-01

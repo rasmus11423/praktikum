@@ -1,0 +1,124 @@
+#include "internship_store.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <stdexcept>
+#include <unordered_map>
+
+#include "csv_parser.hpp"
+
+namespace {
+
+std::string to_lower(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                    [](unsigned char c) { return std::tolower(c); });
+    return out;
+}
+
+bool contains_ci(const std::string& haystack, const std::string& needle) {
+    if (needle.empty()) return true;
+    return to_lower(haystack).find(to_lower(needle)) != std::string::npos;
+}
+
+bool parse_bool(const std::string& raw) {
+    return to_lower(raw) == "true" || raw == "1";
+}
+
+std::vector<std::string> expected_header() {
+    return {"id", "name", "company", "description", "paid",
+            "pay", "employment_type", "deadline"};
+}
+
+}  // namespace
+
+bool is_valid_iso_date(const std::string& date) {
+    if (date.size() != 10) return false;
+    if (date[4] != '-' || date[7] != '-') return false;
+    for (size_t i : {0, 1, 2, 3, 5, 6, 8, 9}) {
+        if (!std::isdigit(static_cast<unsigned char>(date[i]))) return false;
+    }
+    int month = std::stoi(date.substr(5, 2));
+    int day = std::stoi(date.substr(8, 2));
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    return true;
+}
+
+void InternshipStore::load_from_file(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        throw DataLoadError("Could not open data file: " + path);
+    }
+
+    auto rows = csv::parse(file);
+    if (rows.empty()) {
+        throw std::runtime_error("Data file is empty: " + path);
+    }
+
+    const auto& header = rows.front();
+    if (header != expected_header()) {
+        throw std::runtime_error(
+            "Data file has unexpected header (expected id,name,company,"
+            "description,paid,pay,employment_type,deadline): " + path);
+    }
+
+    std::vector<Internship> loaded;
+    loaded.reserve(rows.size() - 1);
+
+    for (size_t r = 1; r < rows.size(); ++r) {
+        const auto& row = rows[r];
+        if (row.size() == 1 && row[0].empty()) continue;  // trailing blank line
+        if (row.size() != header.size()) {
+            throw std::runtime_error(
+                "Data file row " + std::to_string(r + 1) +
+                " has wrong number of columns");
+        }
+        Internship item;
+        item.id = row[0];
+        item.name = row[1];
+        item.company = row[2];
+        item.description = row[3];
+        item.paid = parse_bool(row[4]);
+        item.pay = row[5];
+        item.employment_type = row[6];
+        item.deadline = row[7];
+        loaded.push_back(std::move(item));
+    }
+
+    items_ = std::move(loaded);
+}
+
+std::optional<Internship> InternshipStore::find_by_id(const std::string& id) const {
+    auto it = std::find_if(items_.begin(), items_.end(),
+                            [&](const Internship& i) { return i.id == id; });
+    if (it == items_.end()) return std::nullopt;
+    return *it;
+}
+
+std::vector<Internship> InternshipStore::search(const SearchFilters& filters) const {
+    std::vector<Internship> results;
+    for (const auto& item : items_) {
+        if (filters.q && !(contains_ci(item.name, *filters.q) ||
+                            contains_ci(item.company, *filters.q) ||
+                            contains_ci(item.description, *filters.q))) {
+            continue;
+        }
+        if (filters.paid && item.paid != *filters.paid) {
+            continue;
+        }
+        if (filters.employment_type &&
+            to_lower(item.employment_type) != to_lower(*filters.employment_type)) {
+            continue;
+        }
+        if (filters.deadline_after && item.deadline < *filters.deadline_after) {
+            continue;
+        }
+        if (filters.deadline_before && item.deadline > *filters.deadline_before) {
+            continue;
+        }
+        results.push_back(item);
+    }
+    return results;
+}
