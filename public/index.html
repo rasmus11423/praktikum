@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internship Search (test frontend)</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Internship Search — test harness</h1>
+    <p class="subtitle">Minimal frontend for manually exercising the search/filter API.</p>
+  </header>
+
+  <main>
+    <form id="filters">
+      <input type="search" id="q" name="q" placeholder="Search title, company, description…">
+
+      <fieldset>
+        <legend>Paid</legend>
+        <label><input type="radio" name="paid" value="" checked> Any</label>
+        <label><input type="radio" name="paid" value="true"> Paid</label>
+        <label><input type="radio" name="paid" value="false"> Unpaid</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Employment type</legend>
+        <select id="type" name="type">
+          <option value="">Any</option>
+          <option value="part-time">Part-time</option>
+          <option value="full-time">Full-time</option>
+          <option value="contract">Contract</option>
+        </select>
+      </fieldset>
+
+      <fieldset>
+        <legend>Deadline range</legend>
+        <label>After <input type="date" id="deadline_after" name="deadline_after"></label>
+        <label>Before <input type="date" id="deadline_before" name="deadline_before"></label>
+      </fieldset>
+
+      <button type="submit">Search</button>
+      <button type="button" id="reset">Reset</button>
+    </form>
+
+    <p id="status"></p>
+    <div id="results"></div>
+  </main>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
