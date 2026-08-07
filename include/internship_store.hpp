@@ -10,6 +10,7 @@ struct SearchFilters {
     std::optional<std::string> q;                  // keyword, matched case-insensitively
     std::optional<bool> pay_specified;               // whether "tasu" lists an actual amount
     std::optional<std::string> employment_type;      // exact match, case-insensitive
+    std::optional<std::string> location;              // exact match, case-insensitive
     std::optional<std::vector<std::string>> tags;     // OR-matched: posting needs at least one
     std::optional<std::string> deadline_before;      // ISO date, inclusive upper bound
     std::optional<std::string> deadline_after;        // ISO date, inclusive lower bound
@@ -28,10 +29,10 @@ public:
     // if the header row doesn't match the expected schema.
     void load_from_file(const std::string& path);
 
-    // Postings whose deadline hasn't passed yet. Recomputed against the
-    // current date on every call, not cached, so a long-running server
-    // correctly stops serving a posting the day after its deadline without
-    // needing a restart.
+    // Postings whose deadline hasn't passed yet (a rolling/"Pidev" deadline
+    // never expires). Recomputed against the current date on every call, not
+    // cached, so a long-running server correctly stops serving a posting the
+    // day after its deadline without needing a restart.
     std::vector<Internship> all() const;
 
     std::optional<Internship> find_by_id(const std::string& id) const;
@@ -43,6 +44,11 @@ public:
     // frontend's filter dropdown without hardcoding an enum.
     std::vector<std::string> distinct_employment_types() const;
 
+    // Unique "asukoht" (location) values present in the loaded data, sorted.
+    // Used to validate the `location` query param and to populate the
+    // frontend's filter dropdown.
+    std::vector<std::string> distinct_locations() const;
+
     // Unique tag labels present in the loaded data, sorted. Used to validate
     // the `tags` query param and to compute facet counts.
     std::vector<std::string> distinct_tags() const;
@@ -52,6 +58,3 @@ private:
 
     std::vector<Internship> items_;
 };
-
-// Validates an ISO date string (YYYY-MM-DD, with plausible month/day ranges).
-bool is_valid_iso_date(const std::string& date);

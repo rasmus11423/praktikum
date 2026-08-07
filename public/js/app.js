@@ -27,6 +27,9 @@ function buildQuery() {
   const type = form.type.value;
   if (type) params.set("type", type);
 
+  const location = form.location.value;
+  if (location) params.set("location", location);
+
   const deadlineAfter = form.deadline_after.value;
   if (deadlineAfter) params.set("deadline_after", deadlineAfter);
 
@@ -93,6 +96,9 @@ function renderRow(item, queryTokens) {
   const tagChipsHtml = item.tags.length
     ? item.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")
     : `<span class="no-tags">Sildid puuduvad</span>`;
+  const keywordChipsHtml = item.keywords.length
+    ? item.keywords.map((k) => `<span class="keyword-chip">${highlight(k, queryTokens)}</span>`).join("")
+    : "";
 
   return `
     <div class="row" data-id="${escapeHtml(item.id)}" style="border-left-color: ${relevanceBorderColor(item.relevance)}">
@@ -111,7 +117,20 @@ function renderRow(item, queryTokens) {
       <div class="row-details-inner">
         <div class="row-details-content">
           <p class="row-details-description">${highlight(item.description, queryTokens)}</p>
-          <div class="row-details-tags">${tagChipsHtml}</div>
+          <div class="row-details-meta">
+            <span>Asukoht: ${escapeHtml(item.location) || "—"}</span>
+            <span>Tähtaeg: ${escapeHtml(item.deadline)}</span>
+            <span>Allikas: ${escapeHtml(item.source) || "—"}</span>
+          </div>
+          <div class="row-details-group">
+            <span class="row-details-label">Sildid</span>
+            <div class="row-details-tags">${tagChipsHtml}</div>
+          </div>
+          ${keywordChipsHtml ? `
+          <div class="row-details-group">
+            <span class="row-details-label">Märksõnad</span>
+            <div class="row-details-tags">${keywordChipsHtml}</div>
+          </div>` : ""}
         </div>
       </div>
     </div>
@@ -279,22 +298,27 @@ async function runSearch() {
   }
 }
 
-// Populates the "Tööaeg" dropdown from whatever employment_type values
-// actually appear in the data, instead of hardcoding an enum.
-async function populateEmploymentTypes() {
+// Populates the "Tööaeg" and "Asukoht" dropdowns from whatever values
+// actually appear in the data (one shared fetch), instead of hardcoding
+// enums that would drift out of sync with the CSV.
+async function populateFilterOptions() {
   try {
     const res = await fetch("/api/internships");
     const items = await res.json();
-    const types = [...new Set(items.map((item) => item.employment_type))].sort();
 
-    for (const type of types) {
-      const option = document.createElement("option");
-      option.value = type;
-      option.textContent = type;
-      form.type.appendChild(option);
-    }
+    const fill = (select, values) => {
+      for (const value of [...new Set(values)].sort()) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      }
+    };
+
+    fill(form.type, items.map((item) => item.employment_type));
+    fill(form.location, items.map((item) => item.location));
   } catch (err) {
-    // Non-fatal: dropdown just stays at "Kõik" if this fails.
+    // Non-fatal: dropdowns just stay at "Kõik" if this fails.
   }
 }
 
@@ -339,7 +363,8 @@ for (const radio of form.querySelectorAll('input[name="pay_specified"]')) {
   radio.addEventListener("change", runSearch);
 }
 form.type.addEventListener("change", runSearch);
+form.location.addEventListener("change", runSearch);
 form.deadline_after.addEventListener("change", runSearch);
 form.deadline_before.addEventListener("change", runSearch);
 
-populateEmploymentTypes().then(runSearch);
+populateFilterOptions().then(runSearch);

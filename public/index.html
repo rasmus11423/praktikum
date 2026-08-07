@@ -32,6 +32,13 @@
           </fieldset>
 
           <fieldset>
+            <legend>Asukoht</legend>
+            <select id="location" name="location">
+              <option value="">Kõik</option>
+            </select>
+          </fieldset>
+
+          <fieldset>
             <legend>Tähtaeg</legend>
             <label>Alates <input type="date" id="deadline_after" name="deadline_after"></label>
             <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
@@ -39,7 +46,7 @@
         </div>
       </div>
 
-      <input type="search" id="q" name="q" class="search-input" placeholder="Otsi praktikakohti — pealkiri, ettevõte, kirjeldus…" autocomplete="off">
+      <input type="search" id="q" name="q" class="search-input" placeholder="Otsi praktikakohti — eesti või inglise keeles…" autocomplete="off">
 
       <div class="dropdown">
         <button type="button" id="tagFilterToggle" class="dropdown-toggle" aria-expanded="false">

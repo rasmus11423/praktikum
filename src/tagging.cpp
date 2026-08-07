@@ -63,14 +63,18 @@ const std::vector<TagRule>& rules() {
         {"Personal ja HR", {"personal", "värbam", "hüvitis", "töötajakogemus", "people business"}},
         {"Disain ja kasutajakogemus", {"disain", "ux", "kasutajasõbral", "kujundus"}},
         {"Küberturvalisus", {"küberturv", "turvalisus", "turbe"}},
-        {"Inseneeria ja riistvara", {"insener", "mehaanika", "riistvara", "tootmis", "lennund", "propulsioon", "ülikondensaat"}},
+        {"Inseneeria ja riistvara", {"insener", "mehaanika", "riistvara", "tootmis", "lennund", "propulsioon", "ülikondensaat", "autocad", "cnc", "ehitus", "konstruktsioon"}},
         {"Robootika ja tehisintellekt", {"robo", "masinnägem", "masinõpe", "tehisintellekt", "iot", "asjade interne"}},
         {"Õigus", {"õigus", "jurist", "leping", "juriidil"}},
         {"Müük ja klienditeenindus", {"müügi", "müük", "klienditeenind"}},
         {"Logistika ja tarneahel", {"logistika", "tarneahel", "marsruu", "tarne"}},
-        {"Riigisektor", {"riigiametnik", "riigiasutus", "maksu- ja tolliamet", "tolliamet", "ministeerium"}},
+        {"Riigisektor", {"riigiametnik", "riigiasutus", "maksu- ja tolliamet", "tolliamet", "ministeerium", "avalik sektor", "poliitika"}},
         {"Toote juhtimine", {"toote", "tootejuht"}},
         {"Võrk ja telekom", {"telekommunikatsioon", "võrgu", "mobiilsid", "andmesidevõrk"}},
+        {"Hotellindus ja turism", {"hotellindus", "majutus", "toitlustus", "vastuvõtt", "turism", "spaa", "kokandus", "restoran"}},
+        {"Põllumajandus ja aiandus", {"põllumajandus", "agronoomia", "aiandus", "taimekasvatus"}},
+        {"Kunst ja kultuur", {"kunst", "kultuur", "galerii"}},
+        {"Keskkond ja jätkusuutlikkus", {"keskkond", "jätkusuutlikkus"}},
     };
     return kRules;
 }
@@ -78,8 +82,11 @@ const std::vector<TagRule>& rules() {
 }  // namespace
 
 std::vector<std::string> tags_for(const Internship& item) {
-    std::string haystack_lower =
-        to_lower_ascii(item.name + " " + item.company + " " + item.description);
+    std::string keywords_blob;
+    for (const auto& keyword : item.keywords) keywords_blob += keyword + " ";
+
+    std::string haystack_lower = to_lower_ascii(
+        item.name + " " + item.company + " " + item.description + " " + keywords_blob);
     auto tokens = ranking::tokenize(haystack_lower);
 
     std::vector<std::string> tags;

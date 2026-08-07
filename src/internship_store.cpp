@@ -21,23 +21,27 @@ std::string to_lower(const std::string& s) {
 }
 
 std::vector<std::string> expected_header() {
-    return {"id", "nimi", "ettevõte", "kirjeldus", "tasu",
-            "tööaeg", "tähtaeg", "link"};
+    return {"id", "nimi", "ettevõte", "kirjeldus", "tasu", "tööaeg",
+            "tähtaeg", "link", "asukoht", "leitud_portaalist", "keywords"};
 }
 
-}  // namespace
-
-bool is_valid_iso_date(const std::string& date) {
-    if (date.size() != 10) return false;
-    if (date[4] != '-' || date[7] != '-') return false;
-    for (size_t i : {0, 1, 2, 3, 5, 6, 8, 9}) {
-        if (!std::isdigit(static_cast<unsigned char>(date[i]))) return false;
+// Splits the "keywords" column ("term-term; term-term; ...") into individual
+// phrases. Each phrase is kept as-is (e.g. "tarkvaraarendus-software
+// engineering") rather than split further into Estonian/English halves —
+// several entries are ambiguous to split (e.g. "front-end-front-end",
+// "IT-õigus-IT law"), and keeping the whole phrase works fine for search
+// anyway since tokenizing already treats the internal "-" as a separator.
+std::vector<std::string> split_keywords(const std::string& raw) {
+    std::vector<std::string> parts;
+    size_t start = 0;
+    while (start <= raw.size()) {
+        size_t end = raw.find(';', start);
+        if (end == std::string::npos) end = raw.size();
+        std::string piece = trim(raw.substr(start, end - start));
+        if (!piece.empty()) parts.push_back(piece);
+        start = end + 1;
     }
-    int month = std::stoi(date.substr(5, 2));
-    int day = std::stoi(date.substr(8, 2));
-    if (month < 1 || month > 12) return false;
-    if (day < 1 || day > 31) return false;
-    return true;
+    return parts;
 }
 
 std::string today_iso_date() {
@@ -48,6 +52,8 @@ std::string today_iso_date() {
     std::strftime(buf, sizeof(buf), "%Y-%m-%d", &local);
     return std::string(buf);
 }
+
+}  // namespace
 
 void InternshipStore::load_from_file(const std::string& path) {
     std::ifstream file(path);
@@ -64,7 +70,8 @@ void InternshipStore::load_from_file(const std::string& path) {
     if (header != expected_header()) {
         throw std::runtime_error(
             "Data file has unexpected header (expected id,nimi,ettevõte,"
-            "kirjeldus,tasu,tööaeg,tähtaeg,link): " + path);
+            "kirjeldus,tasu,tööaeg,tähtaeg,link,asukoht,leitud_portaalist,"
+            "keywords): " + path);
     }
 
     std::vector<Internship> loaded;
@@ -87,6 +94,9 @@ void InternshipStore::load_from_file(const std::string& path) {
         item.employment_type = row[5];
         item.deadline = row[6];
         item.link = row[7];
+        item.location = row[8];
+        item.source = row[9];
+        item.keywords = split_keywords(row[10]);
         item.tags = tagging::tags_for(item);
         loaded.push_back(std::move(item));
     }
@@ -98,7 +108,9 @@ std::vector<Internship> InternshipStore::active_items() const {
     std::string today = today_iso_date();
     std::vector<Internship> active;
     for (const auto& item : items_) {
-        if (item.deadline >= today) active.push_back(item);
+        if (is_rolling_deadline(item.deadline) || item.deadline >= today) {
+            active.push_back(item);
+        }
     }
     return active;
 }
@@ -123,6 +135,16 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
         }
         if (filters.employment_type &&
             to_lower(item.employment_type) != to_lower(*filters.employment_type)) {
+            continue;
+        }
+        if (filters.location &&
+            to_lower(item.location) != to_lower(*filters.location)) {
+            continue;
+        }
+        if ((filters.deadline_after || filters.deadline_before) &&
+            is_rolling_deadline(item.deadline)) {
+            // A rolling ("Pidev") deadline has no date to compare against a
+            // requested range, so it can't satisfy a deadline filter.
             continue;
         }
         if (filters.deadline_after && item.deadline < *filters.deadline_after) {
@@ -163,6 +185,17 @@ std::vector<std::string> InternshipStore::distinct_employment_types() const {
     }
     std::sort(types.begin(), types.end());
     return types;
+}
+
+std::vector<std::string> InternshipStore::distinct_locations() const {
+    std::vector<std::string> locations;
+    for (const auto& item : active_items()) {
+        if (std::find(locations.begin(), locations.end(), item.location) == locations.end()) {
+            locations.push_back(item.location);
+        }
+    }
+    std::sort(locations.begin(), locations.end());
+    return locations;
 }
 
 std::vector<std::string> InternshipStore::distinct_tags() const {

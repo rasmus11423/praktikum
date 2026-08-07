@@ -8,11 +8,16 @@ namespace ranking {
 namespace {
 
 // Weights for each searchable field; their sum is the theoretical max score
-// for a single query token that matches exactly everywhere.
+// for a single query token that matches exactly everywhere. Keywords are
+// curated Estonian/English phrases from the CSV, so they're weighted
+// similarly to name — a query word landing there is a deliberate, reliable
+// signal, not just incidental text.
 constexpr double kNameWeight = 5.0;
+constexpr double kKeywordsWeight = 4.0;
 constexpr double kCompanyWeight = 3.0;
 constexpr double kDescriptionWeight = 2.0;
-constexpr double kTotalFieldWeight = kNameWeight + kCompanyWeight + kDescriptionWeight;
+constexpr double kTotalFieldWeight =
+    kNameWeight + kKeywordsWeight + kCompanyWeight + kDescriptionWeight;
 
 constexpr double kFuzzyThreshold = 0.6;   // below this similarity, treat as unrelated
 constexpr double kSubstringScore = 0.7;   // token appears inside/around a word
@@ -100,12 +105,17 @@ double relevance_score(const Internship& item, const std::vector<std::string>& q
         double weight;
     };
 
+    std::string keywords_blob;
+    for (const auto& keyword : item.keywords) keywords_blob += keyword + " ";
+
     std::string name_lower = to_lower_ascii(item.name);
+    std::string keywords_lower = to_lower_ascii(keywords_blob);
     std::string company_lower = to_lower_ascii(item.company);
     std::string description_lower = to_lower_ascii(item.description);
 
     std::vector<Field> fields = {
         {name_lower, tokenize(name_lower), kNameWeight},
+        {keywords_lower, tokenize(keywords_lower), kKeywordsWeight},
         {company_lower, tokenize(company_lower), kCompanyWeight},
         {description_lower, tokenize(description_lower), kDescriptionWeight},
     };

@@ -69,6 +69,20 @@ std::optional<SearchFilters> parse_filters(const httplib::Request& req,
         filters.employment_type = *match;
     }
 
+    if (req.has_param("location")) {
+        std::string raw = req.get_param_value("location");
+        std::string lower_raw = to_lower(raw);
+        auto locations = store.distinct_locations();
+        auto match = std::find_if(locations.begin(), locations.end(), [&](const std::string& l) {
+            return to_lower(l) == lower_raw;
+        });
+        if (match == locations.end()) {
+            error = "Invalid 'location' value: must be one of " + join(locations, ", ");
+            return std::nullopt;
+        }
+        filters.location = *match;
+    }
+
     if (req.has_param("tags")) {
         auto known = store.distinct_tags();
         std::vector<std::string> requested;

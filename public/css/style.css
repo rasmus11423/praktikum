@@ -129,6 +129,28 @@ header h1 { margin-bottom: 0.2rem; font-size: 1.5rem; }
 .row-details-inner { overflow: hidden; }
 .row-details-content { padding: 0.75rem 1rem; }
 .row-details-description { margin: 0 0 0.6rem; font-size: 0.9rem; white-space: normal; }
+
+.row-details-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.2rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.row-details-group { margin-bottom: 0.5rem; }
+.row-details-group:last-child { margin-bottom: 0; }
+.row-details-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
 .row-details-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 .tag-chip {
@@ -138,6 +160,15 @@ header h1 { margin-bottom: 0.2rem; font-size: 1.5rem; }
   background: rgba(52, 87, 213, 0.12);
   color: var(--accent);
 }
+
+.keyword-chip {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(107, 114, 128, 0.12);
+  color: var(--muted);
+}
+.keyword-chip mark { padding: 0; }
 
 /* Sectioned results: relevance tiers when a query is active, or tag groups
    when browsing without one. Each section is just a labeled run of .row. */
