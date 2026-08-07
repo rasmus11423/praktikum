@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <fstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -37,6 +38,15 @@ bool is_valid_iso_date(const std::string& date) {
     if (month < 1 || month > 12) return false;
     if (day < 1 || day > 31) return false;
     return true;
+}
+
+std::string today_iso_date() {
+    std::time_t now = std::time(nullptr);
+    std::tm local{};
+    localtime_r(&now, &local);
+    char buf[11];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d", &local);
+    return std::string(buf);
 }
 
 void InternshipStore::load_from_file(const std::string& path) {
@@ -84,16 +94,28 @@ void InternshipStore::load_from_file(const std::string& path) {
     items_ = std::move(loaded);
 }
 
+std::vector<Internship> InternshipStore::active_items() const {
+    std::string today = today_iso_date();
+    std::vector<Internship> active;
+    for (const auto& item : items_) {
+        if (item.deadline >= today) active.push_back(item);
+    }
+    return active;
+}
+
+std::vector<Internship> InternshipStore::all() const { return active_items(); }
+
 std::optional<Internship> InternshipStore::find_by_id(const std::string& id) const {
-    auto it = std::find_if(items_.begin(), items_.end(),
+    auto active = active_items();
+    auto it = std::find_if(active.begin(), active.end(),
                             [&](const Internship& i) { return i.id == id; });
-    if (it == items_.end()) return std::nullopt;
+    if (it == active.end()) return std::nullopt;
     return *it;
 }
 
 std::vector<Internship> InternshipStore::search(const SearchFilters& filters) const {
     std::vector<Internship> results;
-    for (const auto& item : items_) {
+    for (const auto& item : active_items()) {
         // Note: `q` is intentionally not a hard filter here — it only ranks
         // results (see below). Everything else stays an exact include/exclude.
         if (filters.pay_specified && is_pay_specified(item.pay) != *filters.pay_specified) {
@@ -134,7 +156,7 @@ std::vector<Internship> InternshipStore::search(const SearchFilters& filters) co
 
 std::vector<std::string> InternshipStore::distinct_employment_types() const {
     std::vector<std::string> types;
-    for (const auto& item : items_) {
+    for (const auto& item : active_items()) {
         if (std::find(types.begin(), types.end(), item.employment_type) == types.end()) {
             types.push_back(item.employment_type);
         }
@@ -145,7 +167,7 @@ std::vector<std::string> InternshipStore::distinct_employment_types() const {
 
 std::vector<std::string> InternshipStore::distinct_tags() const {
     std::vector<std::string> tags;
-    for (const auto& item : items_) {
+    for (const auto& item : active_items()) {
         for (const auto& tag : item.tags) {
             if (std::find(tags.begin(), tags.end(), tag) == tags.end()) {
                 tags.push_back(tag);

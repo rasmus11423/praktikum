@@ -241,6 +241,18 @@ id,nimi,ettevõte,kirjeldus,tasu,tööaeg,tähtaeg,link
 
 The CSV is loaded once at startup. Swap the file and restart the server to pick up changes — there's no database yet. The header row must match the Estonian column names above exactly.
 
+### Expired postings are hidden
+
+Every read path (`/api/internships`, `/api/search`, `/api/facets`, and
+`/api/internships/:id`) only ever considers postings whose `deadline` is
+today or later (server local time) — a posting with a past deadline behaves
+as if it doesn't exist: it's excluded from listings/search/facets, and
+fetching it directly by id returns `404`, the same as an unknown id. This is
+computed fresh on every request rather than once at CSV load time, so a
+posting correctly drops out the day after its deadline passes without
+needing a server restart — no cron job or background task needed for this
+simple a rule. See `InternshipStore::active_items()` in `src/internship_store.cpp`.
+
 ## Test frontend
 
 `public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search. The search box is the dominant, centered element; filters live in two dropdowns flanking it rather than a row of separate controls:

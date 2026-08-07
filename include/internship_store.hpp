@@ -28,7 +28,11 @@ public:
     // if the header row doesn't match the expected schema.
     void load_from_file(const std::string& path);
 
-    const std::vector<Internship>& all() const { return items_; }
+    // Postings whose deadline hasn't passed yet. Recomputed against the
+    // current date on every call, not cached, so a long-running server
+    // correctly stops serving a posting the day after its deadline without
+    // needing a restart.
+    std::vector<Internship> all() const;
 
     std::optional<Internship> find_by_id(const std::string& id) const;
 
@@ -44,6 +48,8 @@ public:
     std::vector<std::string> distinct_tags() const;
 
 private:
+    std::vector<Internship> active_items() const;
+
     std::vector<Internship> items_;
 };
 
