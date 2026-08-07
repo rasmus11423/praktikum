@@ -112,6 +112,19 @@ std::vector<Internship> InternshipStore::active_items() const {
             active.push_back(item);
         }
     }
+
+    // Soonest deadline first by default (rolling/"Pidev" postings, having no
+    // date to be urgent about, sort after all dated ones). This is the base
+    // order for every endpoint; search() overrides it with relevance order
+    // when a keyword query is given.
+    std::stable_sort(active.begin(), active.end(), [](const Internship& a, const Internship& b) {
+        bool a_rolling = is_rolling_deadline(a.deadline);
+        bool b_rolling = is_rolling_deadline(b.deadline);
+        if (a_rolling != b_rolling) return !a_rolling;
+        if (a_rolling && b_rolling) return false;
+        return a.deadline < b.deadline;
+    });
+
     return active;
 }
 

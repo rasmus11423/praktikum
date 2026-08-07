@@ -131,6 +131,14 @@ Query params (all optional, combinable):
 
 Invalid values (e.g. `pay_specified=maybe`, an unknown `type`/`location`, a malformed date) return `400` with a JSON `{"error": "..."}` body listing the currently valid values where applicable.
 
+#### Default order: soonest deadline first
+
+Without a `q`, results (and `/api/internships`) are always sorted by
+deadline ascending — the posting closing soonest comes first. Rolling
+("Pidev") postings, having no date to be urgent about, always sort after
+every dated posting. This is the base order everywhere; a `q` query
+overrides it with relevance order (below).
+
 #### How `q` ranking works
 
 Unlike the other params, `q` does **not** exclude non-matching postings — every
@@ -294,6 +302,8 @@ There's no "Otsi"/"Lähtesta" button anymore — search runs automatically: the 
 Results render as a single-line horizontal row per posting (not a card grid) — a favorite-star toggle, relevance badge, name, company, pay, employment type, tags, deadline, a truncated description, and a link out to the original posting. Clicking anywhere on a row (other than the star or the outbound link) expands an inline panel below it with the full description, location/deadline/source, tag chips, and keyword chips — a CSS grid-based collapse/expand animation, no layout-measuring JS needed. Keywords in the expanded panel get the same query-match highlighting as the compact row's name/company/description, since an English search term will often only match there. The favorite star persists to `localStorage`, so favorited postings survive a page reload; there's no dedicated "favorites only" filter yet, just the per-row toggle.
 
 When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
+
+The deadline column (and the expanded panel's "Tähtaeg" line) is color-coded by urgency, computed client-side from `deadline`/`deadline_rolling`: 3 days or less is highlighted red, 7 days or less is yellow, anything further out (or a rolling/"Pidev" posting) stays the neutral color used everywhere else. Combined with the soonest-deadline-first default order, the postings that need action soonest are both first in the list and visually flagged.
 
 Rows are also grouped into sections, computed client-side in `public/js/app.js` from the `relevance`/`tags` already in each `/api/search` result — no extra backend call:
 

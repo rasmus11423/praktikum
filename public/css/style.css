@@ -222,6 +222,23 @@ details.result-section[open] > summary.section-header::before {
 .pay-unspecified { color: var(--muted); font-style: italic; }
 .no-tags { opacity: 0.5; }
 
+/* Deadline urgency: <=3 days red, <=7 days yellow, otherwise the existing
+   neutral muted color already used everywhere else. */
+.deadline-urgent {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.12);
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+.deadline-soon {
+  color: #92600a;
+  background: rgba(217, 119, 6, 0.14);
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+
 .fav-btn {
   background: none;
   border: none;
@@ -270,4 +287,6 @@ mark {
 @media (prefers-color-scheme: dark) {
   :root { --border: #3a3f4b; --muted: #9aa1ad; }
   mark { background: rgba(255, 196, 0, 0.3); }
+  .deadline-urgent { color: #fca5a5; background: rgba(220, 38, 38, 0.22); }
+  .deadline-soon { color: #fcd34d; background: rgba(217, 119, 6, 0.22); }
 }

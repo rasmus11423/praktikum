@@ -68,6 +68,26 @@ function relevanceBorderColor(relevance) {
   return `rgba(52, 87, 213, ${alpha})`;
 }
 
+// Whole calendar days between today and an ISO date, comparing dates only
+// (not times) so the result doesn't drift with the viewer's local clock.
+function daysUntil(isoDate) {
+  const target = new Date(`${isoDate}T00:00:00Z`);
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  return Math.round((target - todayUtc) / 86400000);
+}
+
+// Deadline urgency: <=3 days is red, <=7 days is yellow, otherwise the
+// neutral color already used elsewhere in the UI. Rolling ("Pidev")
+// postings have no date to be urgent about, so they stay neutral.
+function deadlineUrgencyClass(item) {
+  if (item.deadline_rolling) return "";
+  const days = daysUntil(item.deadline);
+  if (days <= 3) return " deadline-urgent";
+  if (days <= 7) return " deadline-soon";
+  return "";
+}
+
 // Renders a row plus its (initially collapsed) inline detail panel, kept as
 // a sibling rather than nested so it doesn't disturb the row's own flex
 // column layout. Expand state and favorite state both persist across
@@ -109,7 +129,7 @@ function renderRow(item, queryTokens) {
       <span class="col-pay">${payHtml}</span>
       <span class="col-type">${escapeHtml(item.employment_type)}</span>
       <span class="col-tags${tagsClass}">${escapeHtml(tagsText)}</span>
-      <span class="col-deadline">${escapeHtml(item.deadline)}</span>
+      <span class="col-deadline${deadlineUrgencyClass(item)}">${escapeHtml(item.deadline)}</span>
       <span class="col-description">${highlight(item.description, queryTokens)}</span>
       <span class="col-link">${linkHtml}</span>
     </div>
@@ -119,7 +139,7 @@ function renderRow(item, queryTokens) {
           <p class="row-details-description">${highlight(item.description, queryTokens)}</p>
           <div class="row-details-meta">
             <span>Asukoht: ${escapeHtml(item.location) || "—"}</span>
-            <span>Tähtaeg: ${escapeHtml(item.deadline)}</span>
+            <span class="${deadlineUrgencyClass(item).trim()}">Tähtaeg: ${escapeHtml(item.deadline)}</span>
             <span>Allikas: ${escapeHtml(item.source) || "—"}</span>
           </div>
           <div class="row-details-group">

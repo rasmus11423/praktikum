@@ -30,13 +30,16 @@ public:
     void load_from_file(const std::string& path);
 
     // Postings whose deadline hasn't passed yet (a rolling/"Pidev" deadline
-    // never expires). Recomputed against the current date on every call, not
-    // cached, so a long-running server correctly stops serving a posting the
-    // day after its deadline without needing a restart.
+    // never expires), soonest deadline first (rolling ones last, since they
+    // have no date to be urgent about). Recomputed against the current date
+    // on every call, not cached, so a long-running server correctly stops
+    // serving a posting the day after its deadline without needing a restart.
     std::vector<Internship> all() const;
 
     std::optional<Internship> find_by_id(const std::string& id) const;
 
+    // Same deadline-first order as all(), unless `filters.q` is set, in
+    // which case results are sorted by relevance instead.
     std::vector<Internship> search(const SearchFilters& filters) const;
 
     // Unique "tööaeg" (employment type) values present in the loaded data,
