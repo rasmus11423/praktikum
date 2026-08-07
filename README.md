@@ -9,7 +9,8 @@ same process. This is backend-focused scaffolding; the real frontend comes later
 ```
 /src        C++ source
 /include    headers
-/data       internships.csv (loaded at startup)
+/data       internships.csv (loaded read-only at startup)
+/userdata   users.json (accounts/favorites/etc., created at runtime — gitignored)
 /public     minimal test frontend (html/css/js), served at "/"
 /docker     Dockerfile, docker-compose.yml
 CMakeLists.txt
@@ -19,10 +20,11 @@ CMakeLists.txt
 
 - C++17, built with CMake.
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib) for HTTP, fetched via CMake `FetchContent`.
-- [nlohmann/json](https://github.com/nlohmann/json) for JSON, fetched via CMake `FetchContent`.
+- [nlohmann/json](https://github.com/nlohmann/json) for JSON, fetched via CMake `FetchContent` — also used as the storage format for user accounts (`userdata/users.json`), read/written directly rather than through a database.
+- [PicoSHA2](https://github.com/okdshin/PicoSHA2) (single-header SHA-256), fetched via CMake `FetchContent`, as the primitive underneath a hand-written HMAC-SHA256/PBKDF2 password hasher (`src/password_hash.cpp`) — see "Accounts" below for why it's PBKDF2 and not bcrypt/argon2, and why there's no database yet.
 - A small hand-written CSV parser (`src/csv_parser.cpp`) — the schema is simple enough not to need a dependency.
 
-No manual library installs are needed beyond CMake and a compiler — `FetchContent` downloads and builds cpp-httplib and nlohmann/json as part of the CMake configure/build step (requires network access the first time).
+No manual library installs are needed beyond CMake and a compiler — `FetchContent` downloads and builds cpp-httplib, nlohmann/json, and PicoSHA2 as part of the CMake configure/build step (requires network access the first time).
 
 ## Building & running on macOS
 
@@ -50,12 +52,12 @@ Run (from the repo root, so the default relative paths to `data/` and `public/` 
 By default it serves on `http://0.0.0.0:8080`. Override with flags or environment variables:
 
 ```sh
-./build/internship_server --port 9090 --data data/internships.csv --public public
+./build/internship_server --port 9090 --data data/internships.csv --public public --userdata userdata/users.json
 # or
-PORT=9090 INTERNSHIP_DATA_PATH=data/internships.csv INTERNSHIP_PUBLIC_DIR=public ./build/internship_server
+PORT=9090 INTERNSHIP_DATA_PATH=data/internships.csv INTERNSHIP_PUBLIC_DIR=public USER_DATA_PATH=userdata/users.json ./build/internship_server
 ```
 
-Then open `http://localhost:8080/` in a browser for the test frontend.
+Then open `http://localhost:8080/` in a browser for the test frontend, or `http://localhost:8080/profile.html` to register/log in.
 
 ## Running with Docker
 
@@ -75,13 +77,16 @@ This exposes the server on `http://localhost:8080` by default. To use a differen
 HOST_PORT=9090 docker compose -f docker/docker-compose.yml up --build
 ```
 
-`data/` is mounted read-only into the container, so you can swap in a new CSV without rebuilding the image — just restart the container to pick up the change (data is loaded once at startup).
+`data/` is mounted read-only into the container, so you can swap in a new CSV without rebuilding the image — just restart the container to pick up the change (data is loaded once at startup). `userdata/` is mounted read-write, so accounts survive `docker compose down`/`up` (they only vanish if you delete the host `userdata/` directory).
 
 To build/run the image manually without compose:
 
 ```sh
 docker build -f docker/Dockerfile -t internship-server .
-docker run --rm -p 8080:8080 -v "$(pwd)/data:/app/data:ro" internship-server
+docker run --rm -p 8080:8080 \
+  -v "$(pwd)/data:/app/data:ro" \
+  -v "$(pwd)/userdata:/app/userdata" \
+  internship-server
 ```
 
 ## API
@@ -248,6 +253,13 @@ curl -G "http://localhost:8080/api/facets" --data-urlencode "type=tähtajaline"
 # Single posting
 curl http://localhost:8080/api/internships/5
 
+# Register, then use the saved session cookie for authenticated requests
+curl -c cookies.txt -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" -d '{"email":"you@example.com","password":"at-least-8-chars"}'
+curl -b cookies.txt -X POST http://localhost:8080/api/me/favorites \
+  -H "Content-Type: application/json" -d '{"internship_id":"1"}'
+curl -b cookies.txt http://localhost:8080/api/me/favorites
+
 # Error cases
 curl -i "http://localhost:8080/api/search?pay_specified=maybe"   # 400
 curl -i "http://localhost:8080/api/search?type=bogus"            # 400, lists valid types
@@ -255,6 +267,79 @@ curl -i -G "http://localhost:8080/api/search" --data-urlencode "location=Bogus" 
 curl -i -G "http://localhost:8080/api/search" --data-urlencode "tags=Bogus"  # 400, lists valid tags
 curl -i http://localhost:8080/api/internships/does-not-exist     # 404
 ```
+
+## Accounts
+
+Registration/login and a per-account profile (favorites, saved search
+presets, recently-viewed history). Deliberately **not** backed by a real
+database yet — see the caveats below before using this for anything beyond
+local testing.
+
+### `POST /api/auth/register`
+Body: `{"email": "...", "password": "..."}`. Password must be 8+ characters;
+email must look like an email and not already be registered (checked
+case-insensitively). On success (`201`), sets a `session` cookie and returns
+`{"id", "email", "created_at"}` — never the password or its hash.
+
+### `POST /api/auth/login`
+Body: `{"email": "...", "password": "..."}`. `401` with a single generic
+"Invalid email or password" message on any failure (wrong password *or*
+unknown email) — this is deliberate, both to avoid confirming which emails
+are registered and because the server does constant-time-ish work either way
+(see "Password hashing" below). On success, sets the `session` cookie and
+returns the same user object as register.
+
+### `POST /api/auth/logout`
+Destroys the current session server-side and clears the cookie. `204`, no body.
+
+### `GET /api/auth/me`
+Returns the current user (from the `session` cookie) or `401` if not logged
+in. Every page checks this on load to decide whether to show a login form or
+profile content.
+
+### `/api/me/*` — requires login (`401` otherwise)
+All operate on whichever account the `session` cookie resolves to.
+
+| endpoint | method | notes |
+|---|---|---|
+| `/api/me/favorites` | `GET` | full posting objects for your favorited ids (silently skips any that expired/no longer exist) |
+| `/api/me/favorites` | `POST` | body `{"internship_id": "..."}`; `404` if the id isn't an active posting |
+| `/api/me/favorites/:id` | `DELETE` | idempotent — removing something not favorited is still `204` |
+| `/api/me/searches` | `GET` | your saved filter presets: `{id, name, query, created_at}` |
+| `/api/me/searches` | `POST` | body `{"name": "...", "query": "..."}` — `query` is a raw querystring (e.g. `"type=t%C3%A4iskoormusega&location=Tallinn"`), applied by the frontend via `/?<query>` |
+| `/api/me/searches/:id` | `DELETE` | |
+| `/api/me/history` | `GET` | your 20 most recently viewed postings, newest first, each with a `viewed_at` timestamp attached |
+| `/api/me/history` | `POST` | body `{"internship_id": "..."}`; re-viewing something already in the list moves it to the front instead of duplicating |
+
+Auth uses an `HttpOnly`, `SameSite=Lax` session cookie (7-day `Max-Age`), **not marked `Secure`** since local dev runs over plain HTTP — add `Secure` and serve over HTTPS before any real deployment. There's no CSRF token; `SameSite=Lax` is the only mitigation, which is a reasonable-but-incomplete baseline for a prototype.
+
+### Password hashing
+
+PBKDF2-HMAC-SHA256, 120,000 iterations, a random 16-byte salt per account,
+constant-time comparison on verify (`src/password_hash.cpp`, built on the
+vendored PicoSHA2 primitive). This is a legitimate, standard KDF — not
+"invented crypto" — but bcrypt/argon2 (memory-hard, purpose-built for
+passwords) would be the right upgrade before any real deployment. Login also
+does a dummy hash verification when the email isn't found, so response
+timing doesn't reveal which emails are registered.
+
+### Why no SQL yet
+
+User data lives in a single JSON file (`userdata/users.json`), guarded by an
+in-process mutex and rewritten in full on every mutation
+(`src/user_store.cpp`). That's fine at the scale of a handful of test
+accounts with infrequent writes, but it doesn't give you real concurrent-write
+safety, indexing, or querying — a real database is the right move before this
+sees meaningful traffic or user counts. Sessions themselves are in-memory
+only (`src/session_store.cpp`) and are lost on restart by design — that just
+means logging in again, not losing data, so it didn't need to be persisted.
+
+### CV upload
+
+The profile page has a CV section, but it's a **UI-only placeholder** — a
+disabled file input with no upload wired up. Actually storing uploaded files
+needs size limits, content-type validation, and a storage location decision
+that haven't been made yet.
 
 ## Data
 
@@ -299,7 +384,20 @@ task needed for this simple a rule. See `InternshipStore::active_items()` in
 
 There's no "Otsi"/"Lähtesta" button anymore — search runs automatically: the search box re-searches on a short debounce as you type, every other control re-searches immediately on change, and pressing Enter in the search box still works too (the `<form>` submit handler is still there, just without a visible button).
 
-Results render as a single-line horizontal row per posting (not a card grid) — a favorite-star toggle, relevance badge, name, company, pay, employment type, tags, deadline, a truncated description, and a link out to the original posting. Clicking anywhere on a row (other than the star or the outbound link) expands an inline panel below it with the full description, location/deadline/source, tag chips, and keyword chips — a CSS grid-based collapse/expand animation, no layout-measuring JS needed. Keywords in the expanded panel get the same query-match highlighting as the compact row's name/company/description, since an English search term will often only match there. The favorite star persists to `localStorage`, so favorited postings survive a page reload; there's no dedicated "favorites only" filter yet, just the per-row toggle.
+Results render as a single-line horizontal row per posting (not a card grid) — a favorite-star toggle, relevance badge, name, company, pay, employment type, tags, deadline, a truncated description, and a link out to the original posting. Clicking anywhere on a row (other than the star or the outbound link) expands an inline panel below it with the full description, location/deadline/source, tag chips, and keyword chips — a CSS grid-based collapse/expand animation, no layout-measuring JS needed. Keywords in the expanded panel get the same query-match highlighting as the compact row's name/company/description, since an English search term will often only match there. There's no dedicated "favorites only" filter yet, just the per-row toggle.
+
+**Signed out**, the favorite star persists to `localStorage` (per-browser, as before) and the header shows a "Logi sisse" link. **Signed in** (see below), the star instead calls the account's favorites API directly, expanding a row records it in your recently-viewed history, and a "☆ Salvesta otsing" button appears next to the search bar to save the current filter combination as a named preset — the header link switches to your email, linking to the profile page.
+
+### Profile page (`/profile.html`)
+
+Signed out, it's a login/register form (email + password, 8+ characters).
+Signed in, it shows: your email and account creation date with a log-out
+button; a CV section that's a **UI-only placeholder** (disabled file input,
+nothing actually uploads yet); your favorited postings (each removable);
+your saved search presets (each a link back to `/?<query>` that reproduces
+those filters, since the main page seeds its filter state from the URL on
+load — plus each is deletable); and your 20 most recently viewed postings.
+All of this reads from the `/api/me/*` endpoints documented above.
 
 When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
 

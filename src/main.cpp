@@ -4,6 +4,7 @@
 
 #include "api_server.hpp"
 #include "internship_store.hpp"
+#include "user_store.hpp"
 
 namespace {
 
@@ -20,6 +21,7 @@ struct Options {
     int port = 8080;
     std::string data_path = "data/internships.csv";
     std::string public_dir = "public";
+    std::string user_data_path = "userdata/users.json";
 };
 
 Options parse_options(int argc, char** argv) {
@@ -28,6 +30,7 @@ Options parse_options(int argc, char** argv) {
     opts.port = std::stoi(env_or("PORT", std::to_string(opts.port)));
     opts.data_path = env_or("INTERNSHIP_DATA_PATH", opts.data_path);
     opts.public_dir = env_or("INTERNSHIP_PUBLIC_DIR", opts.public_dir);
+    opts.user_data_path = env_or("USER_DATA_PATH", opts.user_data_path);
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -41,6 +44,7 @@ Options parse_options(int argc, char** argv) {
         else if (arg == "--port") opts.port = std::stoi(next());
         else if (arg == "--data") opts.data_path = next();
         else if (arg == "--public") opts.public_dir = next();
+        else if (arg == "--userdata") opts.user_data_path = next();
         else {
             throw std::runtime_error("Unknown argument: " + arg);
         }
@@ -73,7 +77,11 @@ int main(int argc, char** argv) {
     std::cout << "Loaded " << store.all().size() << " internship postings from "
               << opts.data_path << "\n";
 
-    ApiServer server(store, opts.public_dir);
+    UserStore users(opts.user_data_path);
+    users.load();
+    std::cout << "User accounts stored at " << opts.user_data_path << "\n";
+
+    ApiServer server(store, users, opts.public_dir);
     std::cout << "Serving on http://" << opts.host << ":" << opts.port
               << " (static: " << opts.public_dir << ")\n";
 

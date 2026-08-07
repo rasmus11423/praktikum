@@ -6,13 +6,61 @@ const moreFiltersPanel = document.getElementById("moreFiltersPanel");
 const tagFilterToggle = document.getElementById("tagFilterToggle");
 const tagFilterPanel = document.getElementById("tagFilterPanel");
 const tagFilterCount = document.getElementById("tagFilterCount");
+const authStatusEl = document.getElementById("authStatus");
+const saveSearchBtn = document.getElementById("saveSearchBtn");
 
 let selectedTags = new Set();
 let expandedIds = new Set();
 let favorites = new Set(JSON.parse(localStorage.getItem("favorites") || "[]"));
+let currentUser = null;  // null = anonymous; {id, email, created_at} once logged in
 
 function saveFavorites() {
   localStorage.setItem("favorites", JSON.stringify([...favorites]));
+}
+
+// Anonymous visitors keep favorites in localStorage (unchanged from before);
+// once logged in, favorites live on the account instead, so this replaces
+// the local Set with what the server has and points future toggles at the
+// server API (see attachRowInteractions' fav-btn handler).
+async function checkAuth() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (!res.ok) {
+      currentUser = null;
+      authStatusEl.textContent = "Logi sisse";
+      saveSearchBtn.classList.add("hidden");
+      return;
+    }
+    currentUser = await res.json();
+    authStatusEl.textContent = currentUser.email;
+    saveSearchBtn.classList.remove("hidden");
+
+    const favRes = await fetch("/api/me/favorites");
+    if (favRes.ok) {
+      const favItems = await favRes.json();
+      favorites = new Set(favItems.map((item) => item.id));
+    }
+  } catch (err) {
+    currentUser = null;
+    authStatusEl.textContent = "Logi sisse";
+  }
+}
+
+// Pre-populates the filter form from the current URL's query params, so a
+// saved-search link (or any shared/bookmarked search URL) reproduces the
+// same filters on load instead of always starting blank.
+function applyFiltersFromUrl() {
+  const params = new URLSearchParams(location.search);
+  if (params.has("q")) form.q.value = params.get("q");
+  if (params.has("pay_specified")) {
+    const radio = form.querySelector(`input[name="pay_specified"][value="${CSS.escape(params.get("pay_specified"))}"]`);
+    if (radio) radio.checked = true;
+  }
+  if (params.has("deadline_after")) form.deadline_after.value = params.get("deadline_after");
+  if (params.has("deadline_before")) form.deadline_before.value = params.get("deadline_before");
+  for (const tag of params.getAll("tags")) selectedTags.add(tag);
+  // `type`/`location` are applied after populateFilterOptions() fills their
+  // <option> lists, otherwise the value wouldn't match any existing option.
 }
 
 function buildQuery() {
@@ -229,9 +277,18 @@ function attachRowInteractions() {
       const id = rowEl.dataset.id;
       const details = resultsEl.querySelector(`.row-details[data-details-for="${id}"]`);
       if (!details) return;
-      if (expandedIds.has(id)) expandedIds.delete(id);
-      else expandedIds.add(id);
+      const nowExpanded = !expandedIds.has(id);
+      if (nowExpanded) expandedIds.add(id);
+      else expandedIds.delete(id);
       details.classList.toggle("expanded");
+
+      if (nowExpanded && currentUser) {
+        fetch("/api/me/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ internship_id: id }),
+        }).catch(() => {});
+      }
     });
   });
 
@@ -239,11 +296,24 @@ function attachRowInteractions() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
-      if (favorites.has(id)) favorites.delete(id);
-      else favorites.add(id);
-      saveFavorites();
-      btn.classList.toggle("favorited", favorites.has(id));
-      btn.textContent = favorites.has(id) ? "★" : "☆";
+      const nowFavorited = !favorites.has(id);
+      if (nowFavorited) favorites.add(id);
+      else favorites.delete(id);
+      btn.classList.toggle("favorited", nowFavorited);
+      btn.textContent = nowFavorited ? "★" : "☆";
+
+      if (currentUser) {
+        const request = nowFavorited
+          ? fetch("/api/me/favorites", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ internship_id: id }),
+            })
+          : fetch(`/api/me/favorites/${encodeURIComponent(id)}`, { method: "DELETE" });
+        request.catch(() => {});
+      } else {
+        saveFavorites();
+      }
     });
   });
 
@@ -337,6 +407,10 @@ async function populateFilterOptions() {
 
     fill(form.type, items.map((item) => item.employment_type));
     fill(form.location, items.map((item) => item.location));
+
+    const params = new URLSearchParams(location.search);
+    if (params.has("type")) form.type.value = params.get("type");
+    if (params.has("location")) form.location.value = params.get("location");
   } catch (err) {
     // Non-fatal: dropdowns just stay at "Kõik" if this fails.
   }
@@ -387,4 +461,25 @@ form.location.addEventListener("change", runSearch);
 form.deadline_after.addEventListener("change", runSearch);
 form.deadline_before.addEventListener("change", runSearch);
 
-populateFilterOptions().then(runSearch);
+saveSearchBtn.addEventListener("click", async () => {
+  const name = prompt("Anna otsingule nimi:");
+  if (!name || !name.trim()) return;
+  try {
+    const res = await fetch("/api/me/searches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, query: buildQuery().toString() }),
+    });
+    if (!res.ok) {
+      const body = await res.json();
+      alert(`Salvestamine ebaõnnestus: ${body.error || res.statusText}`);
+      return;
+    }
+    alert("Otsing salvestatud — leiad selle oma lehelt.");
+  } catch (err) {
+    alert(`Salvestamine ebaõnnestus: ${err.message}`);
+  }
+});
+
+applyFiltersFromUrl();
+checkAuth().then(() => populateFilterOptions().then(runSearch));

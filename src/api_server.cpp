@@ -169,10 +169,73 @@ json tag_facet_counts(const std::vector<Internship>& items) {
     return arr;
 }
 
+std::optional<std::string> get_cookie(const httplib::Request& req, const std::string& name) {
+    std::string header = req.get_header_value("Cookie");
+    size_t pos = 0;
+    while (pos <= header.size()) {
+        size_t semi = header.find(';', pos);
+        std::string part =
+            header.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos);
+        size_t eq = part.find('=');
+        if (eq != std::string::npos) {
+            if (trim(part.substr(0, eq)) == name) return trim(part.substr(eq + 1));
+        }
+        if (semi == std::string::npos) break;
+        pos = semi + 1;
+    }
+    return std::nullopt;
+}
+
+// Not marked Secure since this runs over plain HTTP for local dev; add
+// Secure (and serve over HTTPS) before any real deployment.
+void set_session_cookie(httplib::Response& res, const std::string& token) {
+    res.set_header("Set-Cookie",
+                    "session=" + token + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800");
+}
+
+void clear_session_cookie(httplib::Response& res) {
+    res.set_header("Set-Cookie", "session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+}
+
+std::optional<json> parse_json_body(const httplib::Request& req, std::string& error) {
+    if (req.body.empty()) {
+        error = "Missing request body";
+        return std::nullopt;
+    }
+    try {
+        return json::parse(req.body);
+    } catch (const std::exception&) {
+        error = "Invalid JSON body";
+        return std::nullopt;
+    }
+}
+
+json public_user_to_json(const PublicUser& user) {
+    return json{{"id", user.id}, {"email", user.email}, {"created_at", user.created_at}};
+}
+
+json saved_search_to_json(const SavedSearch& s) {
+    return json{{"id", s.id}, {"name", s.name}, {"query", s.query}, {"created_at", s.created_at}};
+}
+
+// Reads the session cookie and resolves it to a user id, sending a 401
+// itself and returning nullopt if there's no valid session — every /api/me/*
+// handler starts with `auto user_id = require_user(...); if (!user_id) return;`.
+std::optional<std::string> require_user(const httplib::Request& req, httplib::Response& res,
+                                         const SessionStore& sessions) {
+    auto token = get_cookie(req, "session");
+    auto user_id = token ? sessions.user_id_for(*token) : std::nullopt;
+    if (!user_id) {
+        send_error(res, 401, "Not logged in");
+        return std::nullopt;
+    }
+    return user_id;
+}
+
 }  // namespace
 
-ApiServer::ApiServer(InternshipStore& store, std::string public_dir)
-    : store_(store), public_dir_(std::move(public_dir)) {}
+ApiServer::ApiServer(InternshipStore& store, UserStore& users, std::string public_dir)
+    : store_(store), users_(users), public_dir_(std::move(public_dir)) {}
 
 bool ApiServer::listen(const std::string& host, int port) {
     httplib::Server svr;
@@ -220,6 +283,166 @@ bool ApiServer::listen(const std::string& host, int port) {
             return;
         }
         res.set_content(item->to_json().dump(), "application/json");
+    });
+
+    svr.Post("/api/auth/register", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string error;
+        auto body = parse_json_body(req, error);
+        if (!body) {
+            send_error(res, 400, error);
+            return;
+        }
+        std::string reg_error;
+        auto user_id = users_.register_user(body->value("email", ""), body->value("password", ""),
+                                             reg_error);
+        if (!user_id) {
+            send_error(res, 400, reg_error);
+            return;
+        }
+        set_session_cookie(res, sessions_.create_session(*user_id));
+        res.status = 201;
+        res.set_content(public_user_to_json(*users_.get_public_user(*user_id)).dump(),
+                        "application/json");
+    });
+
+    svr.Post("/api/auth/login", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string error;
+        auto body = parse_json_body(req, error);
+        if (!body) {
+            send_error(res, 400, error);
+            return;
+        }
+        auto user_id = users_.verify_login(body->value("email", ""), body->value("password", ""));
+        if (!user_id) {
+            send_error(res, 401, "Invalid email or password");
+            return;
+        }
+        set_session_cookie(res, sessions_.create_session(*user_id));
+        res.set_content(public_user_to_json(*users_.get_public_user(*user_id)).dump(),
+                        "application/json");
+    });
+
+    svr.Post("/api/auth/logout", [this](const httplib::Request& req, httplib::Response& res) {
+        auto token = get_cookie(req, "session");
+        if (token) sessions_.destroy_session(*token);
+        clear_session_cookie(res);
+        res.status = 204;
+    });
+
+    svr.Get("/api/auth/me", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        auto pub = users_.get_public_user(*user_id);
+        if (!pub) {
+            send_error(res, 401, "Not logged in");
+            return;
+        }
+        res.set_content(public_user_to_json(*pub).dump(), "application/json");
+    });
+
+    svr.Get("/api/me/favorites", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        json arr = json::array();
+        for (const auto& id : users_.list_favorite_ids(*user_id)) {
+            if (auto item = store_.find_by_id(id)) arr.push_back(item->to_json());
+        }
+        res.set_content(arr.dump(), "application/json");
+    });
+
+    svr.Post("/api/me/favorites", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        std::string error;
+        auto body = parse_json_body(req, error);
+        if (!body) {
+            send_error(res, 400, error);
+            return;
+        }
+        std::string internship_id = body->value("internship_id", "");
+        if (!store_.find_by_id(internship_id)) {
+            send_error(res, 404, "No internship found with id '" + internship_id + "'");
+            return;
+        }
+        users_.add_favorite(*user_id, internship_id);
+        res.status = 204;
+    });
+
+    svr.Delete(R"(/api/me/favorites/([^/]+))",
+               [this](const httplib::Request& req, httplib::Response& res) {
+                   auto user_id = require_user(req, res, sessions_);
+                   if (!user_id) return;
+                   users_.remove_favorite(*user_id, req.matches[1]);
+                   res.status = 204;
+               });
+
+    svr.Get("/api/me/searches", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        json arr = json::array();
+        for (const auto& s : users_.list_saved_searches(*user_id)) {
+            arr.push_back(saved_search_to_json(s));
+        }
+        res.set_content(arr.dump(), "application/json");
+    });
+
+    svr.Post("/api/me/searches", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        std::string error;
+        auto body = parse_json_body(req, error);
+        if (!body) {
+            send_error(res, 400, error);
+            return;
+        }
+        std::string name = trim(body->value("name", ""));
+        if (name.empty()) {
+            send_error(res, 400, "Saved search needs a name");
+            return;
+        }
+        auto id = users_.add_saved_search(*user_id, name, body->value("query", ""));
+        res.status = 201;
+        res.set_content(json{{"id", *id}}.dump(), "application/json");
+    });
+
+    svr.Delete(R"(/api/me/searches/([^/]+))",
+               [this](const httplib::Request& req, httplib::Response& res) {
+                   auto user_id = require_user(req, res, sessions_);
+                   if (!user_id) return;
+                   users_.delete_saved_search(*user_id, req.matches[1]);
+                   res.status = 204;
+               });
+
+    svr.Get("/api/me/history", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        json arr = json::array();
+        for (const auto& v : users_.list_recently_viewed(*user_id)) {
+            auto item = store_.find_by_id(v.internship_id);
+            if (!item) continue;
+            json j = item->to_json();
+            j["viewed_at"] = v.viewed_at;
+            arr.push_back(std::move(j));
+        }
+        res.set_content(arr.dump(), "application/json");
+    });
+
+    svr.Post("/api/me/history", [this](const httplib::Request& req, httplib::Response& res) {
+        auto user_id = require_user(req, res, sessions_);
+        if (!user_id) return;
+        std::string error;
+        auto body = parse_json_body(req, error);
+        if (!body) {
+            send_error(res, 400, error);
+            return;
+        }
+        std::string internship_id = body->value("internship_id", "");
+        if (!store_.find_by_id(internship_id)) {
+            send_error(res, 404, "No internship found with id '" + internship_id + "'");
+            return;
+        }
+        users_.record_view(*user_id, internship_id);
+        res.status = 204;
     });
 
     svr.set_error_handler([](const httplib::Request&, httplib::Response& res) {

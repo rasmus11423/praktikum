@@ -31,6 +31,7 @@ ENV HOST=0.0.0.0
 ENV PORT=8080
 ENV INTERNSHIP_DATA_PATH=/app/data/internships.csv
 ENV INTERNSHIP_PUBLIC_DIR=/app/public
+ENV USER_DATA_PATH=/app/userdata/users.json
 
 EXPOSE 8080
 

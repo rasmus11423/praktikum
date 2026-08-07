@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="et">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minu leht — Praktikakohtade otsing</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header-top">
+    <div>
+      <h1><a href="/" class="plain-link">Praktikakohtade otsing</a> — Minu leht</h1>
+      <p class="subtitle">Profiil, lemmikud, salvestatud otsingud ja hiljuti vaadatud kuulutused.</p>
+    </div>
+  </header>
+
+  <main class="profile-main">
+    <div id="authForms" class="auth-forms">
+      <div class="auth-tabs">
+        <button type="button" id="tabLogin" class="auth-tab active">Logi sisse</button>
+        <button type="button" id="tabRegister" class="auth-tab">Loo konto</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label>E-post <input type="email" name="email" required autocomplete="email"></label>
+        <label>Parool <input type="password" name="password" required autocomplete="current-password"></label>
+        <button type="submit">Logi sisse</button>
+        <p class="auth-error" id="loginError"></p>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden">
+        <label>E-post <input type="email" name="email" required autocomplete="email"></label>
+        <label>Parool (vähemalt 8 tähemärki) <input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+        <button type="submit">Loo konto</button>
+        <p class="auth-error" id="registerError"></p>
+      </form>
+    </div>
+
+    <div id="profileContent" class="hidden">
+      <section class="profile-section">
+        <h2>Profiil</h2>
+        <p>E-post: <strong id="profileEmail"></strong></p>
+        <p>Konto loodud: <span id="profileCreated"></span></p>
+        <button type="button" id="logoutBtn">Logi välja</button>
+      </section>
+
+      <section class="profile-section">
+        <h2>CV</h2>
+        <div class="cv-placeholder">
+          <p>CV üleslaadimine tuleb peagi — see on hetkel ainult paigutus.</p>
+          <input type="file" disabled>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <h2>Lemmikud</h2>
+        <div id="favoritesList" class="mini-list"></div>
+      </section>
+
+      <section class="profile-section">
+        <h2>Salvestatud otsingud</h2>
+        <div id="searchesList" class="mini-list"></div>
+      </section>
+
+      <section class="profile-section">
+        <h2>Hiljuti vaadatud</h2>
+        <div id="historyList" class="mini-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/profile.js"></script>
+</body>
+</html>

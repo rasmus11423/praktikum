@@ -13,3 +13,7 @@ compile_commands.json
 *.dSYM/
 .DS_Store
 _deps/
+
+# User accounts (hashed passwords, favorites, etc.) — local runtime data,
+# never something to commit.
+userdata/

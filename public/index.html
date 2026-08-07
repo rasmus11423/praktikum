@@ -7,9 +7,12 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
-    <h1>Praktikakohtade otsing — testkeskkond</h1>
-    <p class="subtitle">Minimalistlik liides otsingu ja filtrite käsitsi testimiseks.</p>
+  <header class="header-top">
+    <div>
+      <h1>Praktikakohtade otsing — testkeskkond</h1>
+      <p class="subtitle">Minimalistlik liides otsingu ja filtrite käsitsi testimiseks.</p>
+    </div>
+    <a id="authStatus" class="auth-status" href="/profile.html">…</a>
   </header>
 
   <main>
@@ -54,6 +57,8 @@
         </button>
         <div id="tagFilterPanel" class="dropdown-panel dropdown-panel-right hidden"></div>
       </div>
+
+      <button type="button" id="saveSearchBtn" class="save-search-btn hidden">☆ Salvesta otsing</button>
     </form>
 
     <p id="status"></p>

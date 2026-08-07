@@ -22,12 +22,21 @@ FetchContent_Declare(
   GIT_TAG v3.11.3
 )
 
+# Single-header SHA-256; used as the primitive underneath our own
+# HMAC-SHA256/PBKDF2 password hashing (see src/password_hash.cpp). It has no
+# CMakeLists.txt of its own, so it's only populated, not add_subdirectory'd.
+FetchContent_Declare(
+  picosha2
+  GIT_REPOSITORY https://github.com/okdshin/PicoSHA2.git
+  GIT_TAG master
+)
+
 set(HTTPLIB_REQUIRE_OPENSSL OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_REQUIRE_ZLIB OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_REQUIRE_BROTLI OFF CACHE BOOL "" FORCE)
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 
-FetchContent_MakeAvailable(httplib json)
+FetchContent_MakeAvailable(httplib json picosha2)
 
 add_executable(internship_server
   src/main.cpp
@@ -35,9 +44,12 @@ add_executable(internship_server
   src/search_ranking.cpp
   src/tagging.cpp
   src/internship_store.cpp
+  src/password_hash.cpp
+  src/session_store.cpp
+  src/user_store.cpp
   src/api_server.cpp
 )
 
-target_include_directories(internship_server PRIVATE include)
+target_include_directories(internship_server PRIVATE include ${picosha2_SOURCE_DIR})
 
 target_link_libraries(internship_server PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
