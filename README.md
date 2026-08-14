@@ -359,7 +359,8 @@ that haven't been made yet.
 
 ## Static hosting
 
-The production site (GitHub Pages, custom domain) runs with **no backend at
+The production site (GitHub Pages, at its default `github.io` URL — see
+"Deploying" below) runs with **no backend at
 all** — GitHub Pages only serves static files, and can't run the C++ server.
 Everything the API used to do server-side (`/api/search`, `/api/facets`,
 ranking, filtering, tag faceting) now happens in the browser, and everything
@@ -419,15 +420,19 @@ One-time setup this workflow depends on, done in the repo's GitHub settings
 (not something this workflow or I can do from here):
 1. **Settings → Pages → Build and deployment → Source**: set to "GitHub
    Actions" (not "Deploy from a branch").
-2. **Custom domain** (optional): once you've bought the domain and decided on
-   its exact spelling, add a `CNAME` file to `public/` containing just the
-   domain (e.g. `praktikaportaal.ee`), then in **Settings → Pages → Custom
-   domain** enter the same domain and let GitHub verify it. At your domain
-   registrar/DNS provider: for an apex domain (`praktikaportaal.ee`), add `A`
-   records pointing at GitHub Pages' four IPs (`185.199.108.153`,
-   `185.199.109.153`, `185.199.110.153`, `185.199.111.153`); for a `www`
-   subdomain, a `CNAME` record pointing at `<username>.github.io` instead.
-   DNS propagation can take anywhere from minutes to ~24 hours.
+
+That's the only required step. With no custom domain configured, the site is
+live at GitHub's default project-pages URL:
+**`https://<username>.github.io/<repo-name>/`** — no DNS or extra config
+needed. (The originally-intended domain, `praktikaportaal.ee`, turned out to
+be already taken, so this is the current plan; if a different domain gets
+picked up later, add a `CNAME` file to `public/` containing just that domain,
+enter it in **Settings → Pages → Custom domain**, and at the registrar/DNS
+provider add either `A` records to GitHub Pages' four IPs
+(`185.199.108.153`, `185.199.109.153`, `185.199.110.153`,
+`185.199.111.153`) for an apex domain, or a `CNAME` record to
+`<username>.github.io` for a `www` subdomain — DNS propagation can take
+minutes to ~24 hours.)
 
 ## Data
 
