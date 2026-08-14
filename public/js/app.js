@@ -1,7 +1,12 @@
+// Search/browse page. Statically hosted (see README "Static hosting"), so
+// there's no live backend here — search-engine.js does all ranking/
+// filtering/faceting client-side over a static /data/internships.json
+// snapshot loaded once at startup. Favorites/saved searches/recently-viewed
+// live in localStorage (also via search-engine.js) since there's no login.
+
 const form = document.getElementById("filters");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
-const authStatusEl = document.getElementById("authStatus");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const gridViewBtn = document.getElementById("gridViewBtn");
@@ -23,23 +28,19 @@ const detailModal = document.getElementById("detailModal");
 const modalClose = document.getElementById("modalClose");
 const modalBody = document.getElementById("modalBody");
 
+let ALL_ITEMS = [];
 let selectedTags = new Set();
-let favorites = new Set(JSON.parse(localStorage.getItem("favorites") || "[]"));
-let favoriteItems = [];           // full posting objects for favorites, used by notifications
-let currentUser = null;           // null = anonymous; {id, email, created_at} once logged in
-let paidValue = "";                // "" | "true" | "false"
+let favorites = loadFavoriteIds();
+let favoriteItems = [];            // full posting objects for favorites, used by notifications
+let paidValue = "";                 // "" | "true" | "false"
 let selectedType = "";
 let selectedLocation = "";
 let typeValues = [];
 let locationValues = [];
-let viewMode = "grid";             // "grid" | "list"
+let viewMode = "grid";              // "grid" | "list"
 let lastResults = [];
 let lastQueryTokens = [];
 let currentResultsById = new Map();
-
-function saveFavorites() {
-  localStorage.setItem("favorites", JSON.stringify([...favorites]));
-}
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -225,25 +226,12 @@ function renderSections(items, queryTokens) {
     .join("");
 }
 
-async function toggleFavorite(id) {
+function toggleFavorite(id) {
   const nowFavorited = !favorites.has(id);
   if (nowFavorited) favorites.add(id);
   else favorites.delete(id);
-
-  if (currentUser) {
-    const request = nowFavorited
-      ? fetch("/api/me/favorites", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ internship_id: id }),
-        })
-      : fetch(`/api/me/favorites/${encodeURIComponent(id)}`, { method: "DELETE" });
-    request.catch(() => {});
-  } else {
-    saveFavorites();
-  }
-
-  await refreshFavoriteItems();
+  saveFavoriteIds(favorites);
+  refreshFavoriteItems();
   return nowFavorited;
 }
 
@@ -285,8 +273,8 @@ function renderModalContent(item, queryTokens) {
 function wireModalButtons(item) {
   const modalFavBtn = modalBody.querySelector("#modalFavBtn");
   if (!modalFavBtn) return;
-  modalFavBtn.addEventListener("click", async () => {
-    const nowFav = await toggleFavorite(item.id);
+  modalFavBtn.addEventListener("click", () => {
+    const nowFav = toggleFavorite(item.id);
     modalFavBtn.textContent = nowFav ? "★ Salvestatud" : "☆ Salvesta";
     resultsEl.querySelectorAll(`.fav-btn[data-id="${item.id}"]`).forEach((b) => b.classList.toggle("favorited", nowFav));
   });
@@ -298,14 +286,7 @@ function openModal(id) {
   modalBody.innerHTML = renderModalContent(item, lastQueryTokens);
   wireModalButtons(item);
   detailModal.classList.remove("hidden");
-
-  if (currentUser) {
-    fetch("/api/me/history", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ internship_id: id }),
-    }).catch(() => {});
-  }
+  recordView(id);
 }
 
 function closeModal() {
@@ -326,9 +307,9 @@ function attachResultInteractions() {
   });
 
   resultsEl.querySelectorAll(".fav-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+    btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const nowFav = await toggleFavorite(btn.dataset.id);
+      const nowFav = toggleFavorite(btn.dataset.id);
       btn.classList.toggle("favorited", nowFav);
     });
   });
@@ -413,6 +394,9 @@ function updateClearFiltersVisibility() {
   clearFiltersBtn.classList.toggle("hidden", !hasActiveFilters());
 }
 
+// Shareable/saved-search representation (URL query string) — kept separate
+// from buildFilters() below since it needs a different shape (string params,
+// not a Set) and is also used to seed state back from a URL on load.
 function buildQuery() {
   const params = new URLSearchParams();
 
@@ -432,42 +416,35 @@ function buildQuery() {
   return params;
 }
 
-async function runSearch() {
-  const params = buildQuery();
-  const queryString = params.toString();
+// Shape search-engine.js's search()/tagFacetCounts() expect.
+function buildFilters() {
+  return {
+    q: form.q.value.trim(),
+    paySpecified: paidValue,
+    type: selectedType,
+    location: selectedLocation,
+    deadlineAfter: form.deadline_after.value,
+    deadlineBefore: form.deadline_before.value,
+    tags: selectedTags,
+  };
+}
+
+function runSearch() {
   lastQueryTokens = form.q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  statusEl.textContent = "Otsin…";
   updateClearFiltersVisibility();
 
-  try {
-    const [searchRes, facetsRes] = await Promise.all([
-      fetch(`/api/search?${queryString}`),
-      fetch(`/api/facets?${queryString}`),
-    ]);
-    const body = await searchRes.json();
+  const filters = buildFilters();
+  const results = search(ALL_ITEMS, filters);
 
-    if (!searchRes.ok) {
-      statusEl.textContent = `Viga: ${body.error || searchRes.statusText}`;
-      resultsEl.innerHTML = "";
-      return;
-    }
+  lastResults = results;
+  currentResultsById = new Map(results.map((item) => [item.id, item]));
+  statusEl.textContent = `${results.length} ${pluralize(results.length)}`;
+  resultsEl.innerHTML = results.length
+    ? renderSections(results, lastQueryTokens)
+    : `<div class="dropdown-empty" style="padding:48px 24px; text-align:center; background:var(--color-layer-floor-1); border-radius:var(--corner-radius-l);">Ühtegi praktikat ei leitud sinu filtritega.</div>`;
+  attachResultInteractions();
 
-    lastResults = body;
-    currentResultsById = new Map(body.map((item) => [item.id, item]));
-    statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
-    resultsEl.innerHTML = body.length
-      ? renderSections(body, lastQueryTokens)
-      : `<div class="dropdown-empty" style="padding:48px 24px; text-align:center; background:var(--color-layer-floor-1); border-radius:var(--corner-radius-l);">Ühtegi praktikat ei leitud sinu filtritega.</div>`;
-    attachResultInteractions();
-
-    if (facetsRes.ok) {
-      const facetsBody = await facetsRes.json();
-      renderTagPanel(facetsBody.tags);
-    }
-  } catch (err) {
-    statusEl.textContent = `Päring ebaõnnestus: ${err.message}`;
-    resultsEl.innerHTML = "";
-  }
+  renderTagPanel(tagFacetCounts(ALL_ITEMS, filters));
 }
 
 function setViewMode(mode) {
@@ -486,24 +463,18 @@ listViewBtn.addEventListener("click", () => setViewMode("list"));
 // appear in the data, instead of hardcoding enums. Also seeds selection from
 // the URL's query params (for saved-search links) since the option lists
 // need to exist before a value can be marked active.
-async function populateFilterOptions() {
-  try {
-    const res = await fetch("/api/internships");
-    const items = await res.json();
-    typeValues = [...new Set(items.map((item) => item.employment_type))].sort();
-    locationValues = [...new Set(items.map((item) => item.location))].sort();
+function populateFilterOptions() {
+  typeValues = [...new Set(ALL_ITEMS.map((item) => item.employment_type))].sort();
+  locationValues = [...new Set(ALL_ITEMS.map((item) => item.location))].sort();
 
-    const params = new URLSearchParams(location.search);
-    if (params.has("type")) selectedType = params.get("type");
-    if (params.has("location")) selectedLocation = params.get("location");
+  const params = new URLSearchParams(location.search);
+  if (params.has("type")) selectedType = params.get("type");
+  if (params.has("location")) selectedLocation = params.get("location");
 
-    typeLabel.textContent = selectedType || "Kõik";
-    locationLabel.textContent = selectedLocation || "Kõik";
-    renderTypePanel();
-    renderLocationPanel();
-  } catch (err) {
-    // Non-fatal: dropdowns just stay empty if this fails.
-  }
+  typeLabel.textContent = selectedType || "Kõik";
+  locationLabel.textContent = selectedLocation || "Kõik";
+  renderTypePanel();
+  renderLocationPanel();
 }
 
 function applyFiltersFromUrl() {
@@ -544,46 +515,18 @@ clearFiltersBtn.addEventListener("click", () => {
   runSearch();
 });
 
-saveSearchBtn.addEventListener("click", async () => {
+saveSearchBtn.addEventListener("click", () => {
   const name = prompt("Anna otsingule nimi:");
   if (!name || !name.trim()) return;
-  try {
-    const res = await fetch("/api/me/searches", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, query: buildQuery().toString() }),
-    });
-    if (!res.ok) {
-      const body = await res.json();
-      alert(`Salvestamine ebaõnnestus: ${body.error || res.statusText}`);
-      return;
-    }
-    alert("Otsing salvestatud — leiad selle oma lehelt.");
-  } catch (err) {
-    alert(`Salvestamine ebaõnnestus: ${err.message}`);
-  }
+  addSavedSearch(name.trim(), buildQuery().toString());
+  alert("Otsing salvestatud — leiad selle oma lehelt.");
 });
 
 // ---------- Notifications: computed client-side from favorited postings'
-// deadlines. No backend support needed — favorites already carry deadline
-// data, so this is just filtering/sorting what we already have. ----------
+// deadlines (all data is already local, no fetch needed). ----------
 
-async function refreshFavoriteItems() {
-  try {
-    if (currentUser) {
-      const res = await fetch("/api/me/favorites");
-      favoriteItems = res.ok ? await res.json() : [];
-      favorites = new Set(favoriteItems.map((item) => item.id));
-    } else if (favorites.size) {
-      const res = await fetch("/api/internships");
-      const all = res.ok ? await res.json() : [];
-      favoriteItems = all.filter((item) => favorites.has(item.id));
-    } else {
-      favoriteItems = [];
-    }
-  } catch (err) {
-    favoriteItems = [];
-  }
+function refreshFavoriteItems() {
+  favoriteItems = ALL_ITEMS.filter((item) => favorites.has(item.id));
   updateNotifications();
 }
 
@@ -680,24 +623,22 @@ form.q.addEventListener("input", () => {
 form.deadline_after.addEventListener("change", runSearch);
 form.deadline_before.addEventListener("change", runSearch);
 
-async function checkAuth() {
-  try {
-    const res = await fetch("/api/auth/me");
-    if (res.ok) {
-      currentUser = await res.json();
-      authStatusEl.textContent = currentUser.email;
-      saveSearchBtn.classList.remove("hidden");
-    } else {
-      currentUser = null;
-      authStatusEl.textContent = "Logi sisse";
-      saveSearchBtn.classList.add("hidden");
-    }
-  } catch (err) {
-    currentUser = null;
-    authStatusEl.textContent = "Logi sisse";
-  }
-  await refreshFavoriteItems();
+async function loadAllItems() {
+  const res = await fetch("/data/internships.json");
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  ALL_ITEMS = await res.json();
 }
 
 applyFiltersFromUrl();
-checkAuth().then(() => populateFilterOptions().then(runSearch));
+statusEl.textContent = "Laen andmeid…";
+loadAllItems()
+  .then(() => {
+    refreshFavoriteItems();
+    populateFilterOptions();
+    runSearch();
+  })
+  .catch((err) => {
+    statusEl.textContent =
+      `Andmete laadimine ebaõnnestus (${err.message}). Kohalikuks testimiseks käivita ` +
+      `scripts/generate_static_data.sh, et luua public/data/internships.json.`;
+  });

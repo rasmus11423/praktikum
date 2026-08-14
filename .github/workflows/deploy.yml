@@ -1,0 +1,54 @@
+name: Deploy static site to GitHub Pages
+
+# The site itself has no server component in production (see README's
+# "Static hosting" section) — this workflow builds the C++ backend only
+# long enough to generate public/data/internships.json, then ships the
+# public/ directory as-is. Runs on every push to main, once a day so
+# postings whose deadline has passed drop off even without a code change,
+# and on demand.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build internship_server
+        run: cmake --build build --parallel
+
+      - name: Generate static data snapshot
+        run: ./scripts/generate_static_data.sh
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,18 +1,34 @@
-# Internship Search — Backend
+# Praktikaportaal
 
 A C++ HTTP server that loads internship postings from a CSV file and exposes
-a search/filter JSON API, plus a minimal static test frontend served from the
-same process. This is backend-focused scaffolding; the real frontend comes later.
+a search/filter JSON API, plus a full frontend served from the same process.
+
+**Two deployment modes, sharing one codebase:**
+- **Local dev** — run `./build/internship_server` and everything below (the
+  API, accounts, sessions, the JSON-file user store) works exactly as
+  documented.
+- **Production (GitHub Pages)** — the site is hosted as a **static** site;
+  there is no live backend in production. The frontend runs entirely
+  client-side against a build-time JSON snapshot, and favorites/saved
+  searches/recently-viewed live in the browser's `localStorage` instead of
+  accounts. See **"Static hosting"** below for how that works and how it's
+  built/deployed — read that section first if you're trying to understand
+  what's actually running at the public URL, since most of the "Accounts"
+  section below describes the *local-dev-only* backend path.
 
 ## Project layout
 
 ```
-/src        C++ source
-/include    headers
-/data       internships.csv (loaded read-only at startup)
-/userdata   users.json (accounts/favorites/etc., created at runtime — gitignored)
-/public     minimal test frontend (html/css/js), served at "/"
-/docker     Dockerfile, docker-compose.yml
+/src              C++ source
+/include          headers
+/data             internships.csv (loaded read-only at startup)
+/userdata         users.json (accounts/favorites/etc., local-dev only — gitignored)
+/public           frontend (html/css/js), served at "/" by the C++ server locally,
+                   or as a plain static site in production
+/public/data      internships.json snapshot (generated, gitignored — see "Static hosting")
+/scripts          generate_static_data.sh
+/.github/workflows deploy.yml (builds + deploys the static site to GitHub Pages)
+/docker           Dockerfile, docker-compose.yml
 CMakeLists.txt
 ```
 
@@ -341,6 +357,78 @@ disabled file input with no upload wired up. Actually storing uploaded files
 needs size limits, content-type validation, and a storage location decision
 that haven't been made yet.
 
+## Static hosting
+
+The production site (GitHub Pages, custom domain) runs with **no backend at
+all** — GitHub Pages only serves static files, and can't run the C++ server.
+Everything the API used to do server-side (`/api/search`, `/api/facets`,
+ranking, filtering, tag faceting) now happens in the browser, and everything
+`/api/me/*` used to do (favorites, saved searches, view history) now lives in
+`localStorage` instead of an account. The C++ backend documented above is
+unchanged and still fully works — it's just a local-dev tool now, not
+something production depends on.
+
+### How it works
+
+- **`public/js/search-engine.js`** is a client-side port of
+  `include/search_ranking.hpp`/`src/search_ranking.cpp` and the
+  filtering/faceting logic in `src/internship_store.cpp` — same tokenizing,
+  same field weights (name 5 / keywords 4 / company 3 / description 2), same
+  exact/substring/fuzzy scoring, same tag-facet counting. It also owns the
+  `localStorage` helpers (`loadFavoriteIds`/`saveFavoriteIds`,
+  `loadSavedSearches`/`addSavedSearch`/`deleteSavedSearch`,
+  `loadRecentlyViewed`/`recordView`) shared by `app.js` (search page) and
+  `profile.js` (profile page). One deliberate difference from the C++
+  version: tokenizing here is Unicode-aware (`toLowerCase()` folds accented
+  letters like `Õ` correctly), where the C++ version was ASCII-only.
+- **`public/data/internships.json`** is a static snapshot of what
+  `/api/internships` would return — same expired-deadline filtering, same
+  shape. `app.js`/`profile.js` fetch it once on page load and do everything
+  else (ranking, filtering, faceting) against that in-memory array; there are
+  no other network requests after that.
+- **Favorites, saved searches, recently-viewed** all live in the browser's
+  `localStorage` (see `search-engine.js`'s `LS_KEYS`), scoped to one browser
+  on one device — there's no account, so nothing syncs across devices.
+
+### Generating the snapshot
+
+```sh
+./scripts/generate_static_data.sh
+```
+
+Builds `internship_server` if it isn't already built, runs it briefly against
+`data/internships.csv` with a throwaway user-data path, curls
+`/api/internships`, writes the result to `public/data/internships.json`, and
+shuts the server down. Run this locally before serving `public/` with any
+plain static file server (e.g. `python3 -m http.server` from inside
+`public/`) to test the production code path without the C++ backend.
+`public/data/` is gitignored — it's a build artifact, regenerated on every
+deploy, not something to commit.
+
+### Deploying (GitHub Actions → GitHub Pages)
+
+`.github/workflows/deploy.yml` does the above in CI and publishes the result:
+checks out the repo, builds `internship_server`, runs
+`scripts/generate_static_data.sh`, uploads `public/` as a Pages artifact, and
+deploys it. Triggers: every push to `main`, once a day (`17 3 * * *` UTC —
+picked as an arbitrary quiet hour, not app-load-tolerant scheduling) so
+postings whose deadline has passed drop off the live site even without a code
+change, and manual dispatch from the Actions tab.
+
+One-time setup this workflow depends on, done in the repo's GitHub settings
+(not something this workflow or I can do from here):
+1. **Settings → Pages → Build and deployment → Source**: set to "GitHub
+   Actions" (not "Deploy from a branch").
+2. **Custom domain** (optional): once you've bought the domain and decided on
+   its exact spelling, add a `CNAME` file to `public/` containing just the
+   domain (e.g. `praktikaportaal.ee`), then in **Settings → Pages → Custom
+   domain** enter the same domain and let GitHub verify it. At your domain
+   registrar/DNS provider: for an apex domain (`praktikaportaal.ee`), add `A`
+   records pointing at GitHub Pages' four IPs (`185.199.108.153`,
+   `185.199.109.153`, `185.199.110.153`, `185.199.111.153`); for a `www`
+   subdomain, a `CNAME` record pointing at `<username>.github.io` instead.
+   DNS propagation can take anywhere from minutes to ~24 hours.
+
 ## Data
 
 `data/internships.csv` has one row per posting with columns:
@@ -435,27 +523,27 @@ just restyled. See "Default order: soonest deadline first" and "How `q`
 ranking works" above for the underlying rules.
 
 **Notifications** (the bell icon, top right) are new: a badge dot appears
-when any of *your* favorited postings has a deadline within 7 days. This is
+when any of your favorited postings has a deadline within 7 days. This is
 computed entirely client-side from data already available (your favorites'
-`deadline`/`deadline_rolling` fields) — no new backend endpoint. Signed out,
-it works off the same `localStorage` favorites as before; signed in, off the
-account's real favorites.
+`deadline`/`deadline_rolling` fields, read out of `localStorage`) — no
+backend endpoint involved.
 
-Signed in, a "☆ Salvesta otsing" button appears to save the current filter
-combination as a named preset, and the header link shows your email instead
-of "Logi sisse". Favoriting calls the account API directly instead of
-`localStorage` once signed in.
+The "☆ Salvesta otsing" button is always available and saves the current
+filter combination as a named preset to `localStorage`. Favoriting/saved
+searches/recently-viewed all go through `localStorage` unconditionally now
+(see "Static hosting" below) — there's no login gate on any of it.
 
 ### Profile page (`/profile.html`)
 
-Unchanged in substance from before, restyled to match: signed out, a
-login/register form; signed in, your email + account creation date with a
-log-out button, a CV section that's a **UI-only placeholder** (disabled file
-input, nothing actually uploads), your favorited postings (removable), your
-saved search presets (each a link back to `/?<query>` that reproduces those
-filters — the main page seeds its filter state from the URL on load — and
-deletable), and your 20 most recently viewed postings. All from the
-`/api/me/*` endpoints documented above.
+No login — everything on this page is read straight out of `localStorage`
+(see "Static hosting" below), cross-referenced against the same static data
+snapshot the search page uses: a CV section that's a **UI-only placeholder**
+(disabled file input, nothing actually uploads), your favorited postings
+(removable), your saved search presets (each a link back to `/?<query>` that
+reproduces those filters — the main page seeds its filter state from the URL
+on load — and deletable), and your 20 most recently viewed postings. Since
+there's no account, none of this follows you to a different browser or
+device.
 
 ### Application guide (`/guide.html`)
 

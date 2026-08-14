@@ -21,37 +21,11 @@
   <main class="profile-main">
     <div class="profile-intro">
       <h1 class="bolt-font-heading-l-accent">Minu leht</h1>
-      <p class="bolt-font-body-m-regular profile-intro-sub">Profiil, lemmikud, salvestatud otsingud ja hiljuti vaadatud kuulutused.</p>
+      <p class="bolt-font-body-m-regular profile-intro-sub">Lemmikud, salvestatud otsingud ja hiljuti vaadatud kuulutused.</p>
     </div>
 
-    <div id="authForms" class="auth-forms">
-      <div class="auth-tabs">
-        <button type="button" id="tabLogin" class="auth-tab active">Logi sisse</button>
-        <button type="button" id="tabRegister" class="auth-tab">Loo konto</button>
-      </div>
-
-      <form id="loginForm" class="auth-form">
-        <label class="field-label"><span class="bolt-font-caps-s-accent">E-post</span><input type="email" name="email" required autocomplete="email"></label>
-        <label class="field-label"><span class="bolt-font-caps-s-accent">Parool</span><input type="password" name="password" required autocomplete="current-password"></label>
-        <button type="submit" class="btn-primary">Logi sisse</button>
-        <p class="auth-error" id="loginError"></p>
-      </form>
-
-      <form id="registerForm" class="auth-form hidden">
-        <label class="field-label"><span class="bolt-font-caps-s-accent">E-post</span><input type="email" name="email" required autocomplete="email"></label>
-        <label class="field-label"><span class="bolt-font-caps-s-accent">Parool (vähemalt 8 tähemärki)</span><input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
-        <button type="submit" class="btn-primary">Loo konto</button>
-        <p class="auth-error" id="registerError"></p>
-      </form>
-    </div>
-
-    <div id="profileContent" class="hidden">
-      <section class="profile-section">
-        <h2 class="bolt-font-body-s-accent">Profiil</h2>
-        <p class="bolt-font-body-m-regular">E-post: <strong id="profileEmail"></strong></p>
-        <p class="bolt-font-body-s-regular profile-created">Konto loodud: <span id="profileCreated"></span></p>
-        <button type="button" id="logoutBtn" class="btn-secondary">Logi välja</button>
-      </section>
+    <div id="profileContent">
+      <p class="profile-storage-note bolt-font-body-s-regular">Sellel lehel pole kontot ega sisselogimist — kõik alltoodu salvestub ainult sinu brauserisse (localStorage). Teisest seadmest ega brauserist see nähtav pole.</p>
 
       <section class="profile-section">
         <h2 class="bolt-font-body-s-accent">CV</h2>
@@ -78,6 +52,7 @@
     </div>
   </main>
 
+  <script src="/js/search-engine.js"></script>
   <script src="/js/profile.js"></script>
 </body>
 </html>

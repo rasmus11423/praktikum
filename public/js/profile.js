@@ -1,5 +1,6 @@
-const authForms = document.getElementById("authForms");
-const profileContent = document.getElementById("profileContent");
+// Profile page. No login/backend in the static build — everything here
+// comes from localStorage (via search-engine.js's helpers) cross-referenced
+// against the same static /data/internships.json snapshot app.js uses.
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -62,142 +63,68 @@ function renderSearchRow(s) {
   `;
 }
 
-async function loadFavorites() {
+function renderFavorites(allItems) {
   const el = document.getElementById("favoritesList");
-  try {
-    const res = await fetch("/api/me/favorites");
-    const items = await res.json();
-    el.innerHTML = items.length
-      ? items.map((item) => renderPostingRow(item, "unfavorite")).join("")
-      : `<p class="mini-empty">Lemmikuid pole veel.</p>`;
-    el.querySelectorAll('[data-action="unfavorite"]').forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        await fetch(`/api/me/favorites/${encodeURIComponent(btn.dataset.id)}`, { method: "DELETE" });
-        loadFavorites();
-      });
+  const ids = loadFavoriteIds();
+  const items = allItems.filter((item) => ids.has(item.id));
+
+  el.innerHTML = items.length
+    ? items.map((item) => renderPostingRow(item, "unfavorite")).join("")
+    : `<p class="mini-empty">Lemmikuid pole veel.</p>`;
+
+  el.querySelectorAll('[data-action="unfavorite"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const current = loadFavoriteIds();
+      current.delete(btn.dataset.id);
+      saveFavoriteIds(current);
+      renderFavorites(allItems);
     });
-  } catch (err) {
-    el.innerHTML = `<p class="mini-empty">Laadimine ebaõnnestus.</p>`;
-  }
+  });
 }
 
-async function loadSearches() {
+function renderSearches() {
   const el = document.getElementById("searchesList");
-  try {
-    const res = await fetch("/api/me/searches");
-    const items = await res.json();
-    el.innerHTML = items.length
-      ? items.map(renderSearchRow).join("")
-      : `<p class="mini-empty">Salvestatud otsinguid pole veel — need saad lisada otsingulehelt "☆ Salvesta otsing" nupuga.</p>`;
-    el.querySelectorAll('[data-action="delete-search"]').forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        await fetch(`/api/me/searches/${encodeURIComponent(btn.dataset.id)}`, { method: "DELETE" });
-        loadSearches();
-      });
+  const items = loadSavedSearches();
+
+  el.innerHTML = items.length
+    ? items.map(renderSearchRow).join("")
+    : `<p class="mini-empty">Salvestatud otsinguid pole veel — need saad lisada otsingulehelt "☆ Salvesta otsing" nupuga.</p>`;
+
+  el.querySelectorAll('[data-action="delete-search"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      deleteSavedSearch(btn.dataset.id);
+      renderSearches();
     });
-  } catch (err) {
-    el.innerHTML = `<p class="mini-empty">Laadimine ebaõnnestus.</p>`;
-  }
+  });
 }
 
-async function loadHistory() {
+function renderHistory(allItems) {
   const el = document.getElementById("historyList");
-  try {
-    const res = await fetch("/api/me/history");
-    const items = await res.json();
-    el.innerHTML = items.length
-      ? items.map(renderHistoryRow).join("")
-      : `<p class="mini-empty">Vaadatud kuulutusi pole veel.</p>`;
-  } catch (err) {
-    el.innerHTML = `<p class="mini-empty">Laadimine ebaõnnestus.</p>`;
-  }
+  const byId = new Map(allItems.map((item) => [item.id, item]));
+  const views = loadRecentlyViewed();
+  const items = views
+    .map((v) => (byId.has(v.internship_id) ? { ...byId.get(v.internship_id), viewed_at: v.viewed_at } : null))
+    .filter(Boolean);
+
+  el.innerHTML = items.length
+    ? items.map(renderHistoryRow).join("")
+    : `<p class="mini-empty">Vaadatud kuulutusi pole veel.</p>`;
 }
 
-function showAuthForms() {
-  authForms.classList.remove("hidden");
-  profileContent.classList.add("hidden");
+async function loadAllItems() {
+  const res = await fetch("/data/internships.json");
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
 }
 
-function showProfile(user) {
-  authForms.classList.add("hidden");
-  profileContent.classList.remove("hidden");
-  document.getElementById("profileEmail").textContent = user.email;
-  document.getElementById("profileCreated").textContent = user.created_at.slice(0, 10);
-  loadFavorites();
-  loadSearches();
-  loadHistory();
-}
-
-async function checkAuthAndRender() {
-  try {
-    const res = await fetch("/api/auth/me");
-    if (!res.ok) {
-      showAuthForms();
-      return;
-    }
-    showProfile(await res.json());
-  } catch (err) {
-    showAuthForms();
-  }
-}
-
-function switchTab(which) {
-  document.getElementById("tabLogin").classList.toggle("active", which === "login");
-  document.getElementById("tabRegister").classList.toggle("active", which === "register");
-  document.getElementById("loginForm").classList.toggle("hidden", which !== "login");
-  document.getElementById("registerForm").classList.toggle("hidden", which !== "register");
-}
-
-document.getElementById("tabLogin").addEventListener("click", () => switchTab("login"));
-document.getElementById("tabRegister").addEventListener("click", () => switchTab("register"));
-
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const errorEl = document.getElementById("loginError");
-  errorEl.textContent = "";
-  try {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email.value, password: form.password.value }),
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      errorEl.textContent = body.error || "Sisselogimine ebaõnnestus";
-      return;
-    }
-    showProfile(body);
-  } catch (err) {
-    errorEl.textContent = `Päring ebaõnnestus: ${err.message}`;
-  }
-});
-
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const errorEl = document.getElementById("registerError");
-  errorEl.textContent = "";
-  try {
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email.value, password: form.password.value }),
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      errorEl.textContent = body.error || "Konto loomine ebaõnnestus";
-      return;
-    }
-    showProfile(body);
-  } catch (err) {
-    errorEl.textContent = `Päring ebaõnnestus: ${err.message}`;
-  }
-});
-
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-  await fetch("/api/auth/logout", { method: "POST" });
-  showAuthForms();
-});
-
-checkAuthAndRender();
+loadAllItems()
+  .then((allItems) => {
+    renderFavorites(allItems);
+    renderSearches();
+    renderHistory(allItems);
+  })
+  .catch((err) => {
+    document.getElementById("favoritesList").innerHTML = `<p class="mini-empty">Laadimine ebaõnnestus: ${escapeHtml(err.message)}</p>`;
+    document.getElementById("historyList").innerHTML = "";
+    renderSearches();
+  });
