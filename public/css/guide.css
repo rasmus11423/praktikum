@@ -1,0 +1,57 @@
+/* Application Guide page (guide.html) — static content, no backend. */
+
+.guide-hero { padding-bottom: 56px; }
+
+.guide-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+
+.guide-toc { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.guide-toc .chip { font: 650 0.85rem "InterVariable", sans-serif; padding: 8px 18px; }
+
+.guide-kicker { color: var(--color-content-tertiary); margin-bottom: 8px; }
+.guide-section h2 { margin: 0 0 20px; }
+.guide-lead { color: var(--color-content-secondary); margin: 0 0 24px; }
+
+.guide-cards { display: flex; flex-direction: column; gap: 20px; }
+.guide-card {
+  background: var(--color-layer-floor-1);
+  border-radius: var(--corner-radius-l);
+  padding: 20px;
+}
+.guide-card-title { color: var(--color-content-primary); margin-bottom: 6px; }
+.guide-card p { color: var(--color-content-secondary); margin: 0; }
+
+.guide-steps { display: flex; flex-direction: column; gap: 16px; }
+.guide-step {
+  display: flex;
+  gap: 16px;
+  background: var(--color-layer-floor-1);
+  border-radius: var(--corner-radius-l);
+  padding: 20px;
+}
+.guide-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--corner-radius-full);
+  background: var(--color-bg-action-secondary);
+  color: var(--color-content-action-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font: 650 14px "InterVariable", sans-serif;
+}
+.guide-step p { color: var(--color-content-secondary); margin: 0; }
+
+.guide-cta {
+  background: var(--color-layer-floor-0-grouped);
+  border-radius: var(--corner-radius-l);
+  padding: 28px;
+  text-align: center;
+}

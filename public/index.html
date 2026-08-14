@@ -3,80 +3,130 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Praktikakohtade otsing (testkeskkond)</title>
+  <title>Praktikaportaal — praktikakohtade otsing</title>
+  <link rel="stylesheet" href="/css/design-system.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header class="header-top">
-    <div>
-      <h1>Praktikakohtade otsing — testkeskkond</h1>
-      <p class="subtitle">Minimalistlik liides otsingu ja filtrite käsitsi testimiseks.</p>
-    </div>
-    <a id="authStatus" class="auth-status" href="/profile.html">…</a>
-  </header>
-
-  <main>
-    <form id="filters" class="search-bar">
-      <div class="dropdown">
-        <button type="button" id="moreFiltersToggle" class="dropdown-toggle" aria-expanded="false">Filtrid ▾</button>
-        <div id="moreFiltersPanel" class="dropdown-panel hidden">
-          <fieldset>
-            <legend>Tasu</legend>
-            <label><input type="radio" name="pay_specified" value="" checked> Kõik</label>
-            <label><input type="radio" name="pay_specified" value="true"> Tasu märgitud</label>
-            <label><input type="radio" name="pay_specified" value="false"> Pole märgitud</label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Tööaeg</legend>
-            <select id="type" name="type">
-              <option value="">Kõik</option>
-            </select>
-          </fieldset>
-
-          <fieldset>
-            <legend>Asukoht</legend>
-            <select id="location" name="location">
-              <option value="">Kõik</option>
-            </select>
-          </fieldset>
-
-          <fieldset>
-            <legend>Tähtaeg</legend>
-            <label>Alates <input type="date" id="deadline_after" name="deadline_after"></label>
-            <label>Kuni <input type="date" id="deadline_before" name="deadline_before"></label>
-          </fieldset>
+  <header class="site-header">
+    <a href="/" class="brand bolt-font-heading-xs-accent">Praktikaportaal</a>
+    <nav class="site-nav">
+      <a href="/guide.html" class="bolt-font-body-s-accent">Juhend</a>
+    </nav>
+    <div class="header-actions">
+      <div class="dropdown notif-wrap">
+        <button type="button" id="notifToggle" class="icon-btn" aria-label="Teated" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 8a6 6 0 0112 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6z"/><path d="M9.5 17a2.5 2.5 0 005 0"/></svg>
+          <span id="notifDot" class="notif-dot hidden"></span>
+        </button>
+        <div id="notifPanel" class="dropdown-panel notif-panel hidden">
+          <div id="notifList"></div>
         </div>
       </div>
-
-      <input type="search" id="q" name="q" class="search-input" placeholder="Otsi praktikakohti — eesti või inglise keeles…" autocomplete="off">
-
-      <div class="dropdown">
-        <button type="button" id="tagFilterToggle" class="dropdown-toggle" aria-expanded="false">
-          Sildid<span id="tagFilterCount"></span> ▾
-        </button>
-        <div id="tagFilterPanel" class="dropdown-panel dropdown-panel-right hidden"></div>
-      </div>
-
-      <button type="button" id="saveSearchBtn" class="save-search-btn hidden">☆ Salvesta otsing</button>
-    </form>
-
-    <p id="status"></p>
-
-    <div class="row row-header">
-      <span class="col-favorite"></span>
-      <span class="col-relevance"></span>
-      <span class="col-name">Nimi</span>
-      <span class="col-company">Ettevõte</span>
-      <span class="col-pay">Tasu</span>
-      <span class="col-type">Tööaeg</span>
-      <span class="col-tags">Sildid</span>
-      <span class="col-deadline">Tähtaeg</span>
-      <span class="col-description">Kirjeldus</span>
-      <span class="col-link"></span>
+      <a id="authStatus" class="auth-status bolt-font-body-s-accent" href="/profile.html">…</a>
     </div>
+  </header>
+
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-kicker bolt-font-caps-s-accent">Üliõpilastele</div>
+      <h1 class="hero-title bolt-font-display-m-regular">Leia endale sobiv praktikakoht</h1>
+      <p class="hero-body bolt-font-body-l-regular">Sirvi praktikapakkumisi ja filtreeri tasu, valdkonna, asukoha ja tähtaja järgi — eesti või inglise keeles.</p>
+    </div>
+  </div>
+
+  <main>
+    <div class="search-panel-wrap">
+      <form id="filters" class="search-panel">
+        <div class="search-input-wrap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="search" id="q" name="q" class="search-input" placeholder="Otsi ametinimetust, ettevõtet, kirjeldust…" autocomplete="off">
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label bolt-font-caps-s-accent">Tasu</span>
+            <div class="segmented" id="paidSegmented">
+              <button type="button" class="segmented-btn active" data-value="">Kõik</button>
+              <button type="button" class="segmented-btn" data-value="true">Tasustatud</button>
+              <button type="button" class="segmented-btn" data-value="false">Tasustamata</button>
+            </div>
+          </div>
+
+          <div class="filter-group dropdown">
+            <span class="filter-label bolt-font-caps-s-accent">Tööaeg</span>
+            <button type="button" id="typeToggle" class="pill-dropdown-toggle" aria-expanded="false">
+              <span id="typeLabel">Kõik</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="typePanel" class="dropdown-panel hidden"></div>
+          </div>
+
+          <div class="filter-group dropdown">
+            <span class="filter-label bolt-font-caps-s-accent">Valdkond</span>
+            <button type="button" id="tagFilterToggle" class="pill-dropdown-toggle" aria-expanded="false">
+              <span>Valdkond<span id="tagFilterCount"></span></span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="tagFilterPanel" class="dropdown-panel hidden"></div>
+          </div>
+
+          <div class="filter-group dropdown">
+            <span class="filter-label bolt-font-caps-s-accent">Asukoht</span>
+            <button type="button" id="locationToggle" class="pill-dropdown-toggle" aria-expanded="false">
+              <span id="locationLabel">Kõik</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="locationPanel" class="dropdown-panel hidden"></div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-label bolt-font-caps-s-accent">Tähtaeg</span>
+            <div class="date-range">
+              <input type="date" id="deadline_after" name="deadline_after" class="date-input" aria-label="Alates">
+              <span class="date-range-sep">–</span>
+              <input type="date" id="deadline_before" name="deadline_before" class="date-input" aria-label="Kuni">
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="results-toolbar">
+      <span id="status" class="results-count bolt-font-body-m-accent"></span>
+      <button type="button" id="clearFiltersBtn" class="clear-filters-btn hidden bolt-font-body-s-accent">
+        Eemalda kõik filtrid
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <button type="button" id="saveSearchBtn" class="save-search-btn hidden">☆ Salvesta otsing</button>
+      <div class="view-toggle">
+        <button type="button" id="gridViewBtn" class="view-toggle-btn active" aria-label="Ruudustik">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+        </button>
+        <button type="button" id="listViewBtn" class="view-toggle-btn" aria-label="Loend">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+
     <div id="results"></div>
   </main>
+
+  <footer class="site-footer">
+    <span class="bolt-font-body-s-regular">© 2026 Praktikaportaal — praktikakohtade otsing üliõpilastele.</span>
+    <div class="footer-links">
+      <a href="/guide.html" class="bolt-font-body-s-regular">Juhend</a>
+    </div>
+  </footer>
+
+  <div id="detailModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button type="button" id="modalClose" class="modal-close" aria-label="Sulge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
 
   <script src="/js/app.js"></script>
 </body>

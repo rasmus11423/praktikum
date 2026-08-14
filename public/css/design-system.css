@@ -1,0 +1,232 @@
+/* ============================================================================
+   Design system — colors + type
+   Ported from a Claude-generated design draft ("Kalep" token set, Bolt-green
+   theme). Adapted from the source's manual [data-mode="dark"] attribute to
+   this project's existing @media (prefers-color-scheme: dark) convention,
+   since there's no theme toggle here.
+   ============================================================================ */
+
+/* ---------- Fonts (self-hosted, no external CDN) ---------- */
+@font-face {
+  font-family: "InterVariable";
+  src: url("/fonts/Inter-VariableFont.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "InterVariable";
+  src: url("/fonts/Inter-Italic-VariableFont.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ---------- Primitive (core) color tokens ---------- */
+:root {
+  --color-core-white: #ffffff;
+  --color-core-black: #000000;
+  --color-core-brand-green: #2A9C64;
+  --color-core-brand-green-dark: #0C2C1C;
+
+  --color-core-green-1: rgba(251, 254, 252, 1);
+  --color-core-green-3: rgba(231, 246, 237, 1);
+  --color-core-green-5: rgba(200, 231, 212, 1);
+  --color-core-green-7: rgba(152, 203, 172, 1);
+  --color-core-green-9: rgba(43, 134, 89, 1);
+  --color-core-green-10: rgba(24, 120, 76, 1);
+  --color-core-green-11: rgba(20, 123, 81, 1);
+  --color-core-green-12: rgba(8, 31, 20, 1);
+
+  --color-core-red-3: rgba(255, 234, 234, 1);
+  --color-core-red-5: rgba(255, 205, 205, 1);
+  --color-core-red-9: rgba(222, 25, 41, 1);
+  --color-core-red-10: rgba(206, 0, 25, 1);
+  --color-core-red-11: rgba(178, 15, 28, 1);
+
+  --color-core-yellow-3: rgba(255, 240, 197, 1);
+  --color-core-yellow-5: rgba(255, 219, 144, 1);
+  --color-core-yellow-9: rgba(255, 178, 0, 1);
+  --color-core-yellow-10: rgba(255, 161, 0, 1);
+
+  --color-core-purple-3: rgba(238, 242, 255, 1);
+  --color-core-purple-9: rgba(89, 102, 243, 1);
+  --color-core-purple-10: rgba(79, 91, 218, 1);
+  --color-core-purple-11: rgba(68, 19, 217, 1);
+
+  --color-core-sage-1: rgba(251, 253, 252, 1);
+  --color-core-sage-3: rgba(238, 241, 240, 1);
+  --color-core-sage-5: rgba(222, 226, 225, 1);
+  --color-core-sage-7: rgba(203, 207, 206, 1);
+  --color-core-sage-9: rgba(134, 142, 139, 1);
+  --color-core-sage-11: rgba(95, 101, 99, 1);
+  --color-core-sage-12: rgba(25, 31, 28, 1);
+
+  --color-core-black-alpha-3: rgba(0, 0, 0, 0.06);
+  --color-core-black-alpha-5: rgba(0, 0, 0, 0.12);
+  --color-core-black-alpha-9: rgba(0, 0, 0, 0.45);
+  --color-core-black-alpha-12: rgba(0, 0, 0, 0.88);
+
+  /* ---------- Semantic tokens — light (default) ---------- */
+  --color-layer-floor-0: #ffffff;
+  --color-layer-floor-0-grouped: rgba(238, 241, 240, 1);
+  --color-layer-floor-1: #ffffff;
+  --color-layer-floor-2: #ffffff;
+  --color-layer-floor-3: #ffffff;
+  --color-layer-surface: rgba(0, 45, 30, 0.07);
+
+  --color-content-primary: rgba(25, 31, 28, 1);
+  --color-content-secondary: rgba(0, 10, 7, 0.63);
+  --color-content-tertiary: rgba(0, 17, 11, 0.47);
+  --color-content-action-primary: rgba(0, 112, 66, 0.92);
+  --color-content-action-secondary: rgba(0, 110, 55, 0.83);
+  --color-content-danger-primary: rgba(173, 0, 14, 0.94);
+  --color-content-warning-primary: rgba(158, 91, 0, 1);
+  --color-content-positive-primary: rgba(0, 112, 66, 0.92);
+  --color-content-promo-primary: rgba(56, 4, 215, 0.94);
+  --color-content-link-primary: rgba(0, 112, 66, 0.92);
+  --color-content-primary-inverted: rgba(253, 255, 254, 0.93);
+
+  --color-bg-neutral-primary: rgba(14, 16, 16, 1);
+  --color-bg-neutral-secondary: rgba(0, 45, 30, 0.07);
+  --color-bg-action-primary: rgba(43, 134, 89, 1);
+  --color-bg-action-secondary: rgba(0, 160, 64, 0.09);
+  --color-bg-danger-primary: rgba(222, 25, 41, 1);
+  --color-bg-danger-secondary: rgba(255, 0, 0, 0.08);
+  --color-bg-warning-primary: rgba(255, 178, 0, 1);
+  --color-bg-warning-secondary: rgba(255, 190, 0, 0.23);
+  --color-bg-positive-primary: rgba(43, 134, 89, 1);
+  --color-bg-promo-primary: rgba(89, 102, 243, 1);
+  --color-bg-promo-secondary: rgba(0, 60, 255, 0.07);
+
+  --color-bg-active-action-primary: rgba(24, 120, 76, 1);
+  --color-bg-active-neutral-secondary: rgba(0, 31, 24, 0.13);
+
+  --color-border-neutral-primary: rgba(0, 17, 11, 0.47);
+  --color-border-neutral-secondary: rgba(0, 20, 13, 0.16);
+  --color-border-separator: rgba(0, 45, 30, 0.07);
+  --color-border-action-primary: rgba(43, 134, 89, 1);
+
+  --color-special-scrim: rgba(0, 0, 0, 0.28);
+  --color-special-brand: #2A9C64;
+  --color-special-brand-alt: #0C2C1C;
+  --color-special-bg-disabled: rgba(0, 45, 30, 0.07);
+
+  /* ---------- Dimensions / spacing / radii ---------- */
+  --dimension-50: 0.125rem;
+  --dimension-100: 0.25rem;
+  --dimension-150: 0.375rem;
+  --dimension-200: 0.5rem;
+  --dimension-300: 0.75rem;
+  --dimension-400: 1rem;
+  --dimension-500: 1.25rem;
+  --dimension-600: 1.5rem;
+  --dimension-800: 2rem;
+  --dimension-1000: 2.5rem;
+  --dimension-1200: 3rem;
+  --dimension-1600: 4rem;
+
+  --corner-radius-xs: 0.25rem;
+  --corner-radius-s: 0.5rem;
+  --corner-radius-m: 0.75rem;
+  --corner-radius-l: 1rem;
+  --corner-radius-xl: 1.5rem;
+  --corner-radius-full: 600rem;
+
+  --size-icon-xs: 1rem;
+  --size-icon-s: 1.25rem;
+  --size-icon-m: 1.5rem;
+  --size-icon-l: 2rem;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-floating: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- Semantic tokens — dark ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-layer-floor-0: #000000;
+    --color-layer-floor-0-grouped: #000000;
+    --color-layer-floor-1: rgba(14, 16, 16, 1);
+    --color-layer-floor-2: rgba(22, 26, 24, 1);
+    --color-layer-floor-3: rgba(32, 34, 33, 1);
+    --color-layer-surface: rgba(244, 246, 233, 0.08);
+
+    --color-content-primary: rgba(236, 238, 237, 1);
+    --color-content-secondary: rgba(244, 254, 249, 0.69);
+    --color-content-tertiary: rgba(229, 253, 245, 0.46);
+    --color-content-action-primary: rgba(119, 248, 176, 0.96);
+    --color-content-danger-primary: rgba(255, 159, 148, 1);
+    --color-content-warning-primary: rgba(255, 191, 53, 1);
+    --color-content-positive-primary: rgba(119, 248, 176, 0.96);
+    --color-content-promo-primary: rgba(178, 183, 255, 0.98);
+    --color-content-link-primary: rgba(119, 248, 176, 0.96);
+    --color-content-primary-inverted: rgba(25, 31, 28, 1);
+
+    --color-bg-neutral-primary: rgba(251, 253, 252, 1);
+    --color-bg-neutral-secondary: rgba(244, 246, 233, 0.08);
+    --color-bg-action-primary: rgba(43, 134, 89, 1);
+    --color-bg-action-secondary: rgba(0, 255, 110, 0.12);
+    --color-bg-danger-primary: rgba(222, 25, 41, 1);
+    --color-bg-danger-secondary: rgba(254, 11, 6, 0.2);
+    --color-bg-warning-primary: rgba(255, 178, 0, 1);
+    --color-bg-warning-secondary: rgba(255, 133, 0, 0.14);
+    --color-bg-positive-primary: rgba(43, 134, 89, 1);
+    --color-bg-promo-primary: rgba(89, 102, 243, 1);
+    --color-bg-promo-secondary: rgba(64, 81, 252, 0.26);
+
+    --color-bg-active-action-primary: rgba(24, 120, 76, 1);
+    --color-bg-active-neutral-secondary: rgba(241, 250, 243, 0.14);
+
+    --color-border-neutral-primary: rgba(225, 253, 241, 0.4);
+    --color-border-neutral-secondary: rgba(242, 255, 244, 0.18);
+    --color-border-separator: rgba(244, 246, 233, 0.08);
+    --color-border-action-primary: rgba(43, 134, 89, 1);
+
+    --color-special-scrim: rgba(0, 0, 0, 0.48);
+    --color-special-bg-disabled: rgba(244, 246, 233, 0.08);
+  }
+}
+
+/* ---------- Type scale (utility classes, Inter variable) ---------- */
+.bolt-font-base {
+  font-family: "InterVariable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "cv03", "cv04", "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+}
+.bolt-font-display-m-regular { font: 450 3rem/3.75rem "InterVariable", sans-serif; letter-spacing: -0.022em; font-variation-settings: "opsz" 32; }
+.bolt-font-heading-l-accent  { font: 650 2rem/2.5rem   "InterVariable", sans-serif; letter-spacing: -0.022em; font-variation-settings: "opsz" 32; }
+.bolt-font-heading-m-accent  { font: 650 1.75rem/2.25rem "InterVariable", sans-serif; letter-spacing: -0.02em;  font-variation-settings: "opsz" 28; }
+.bolt-font-heading-s-accent  { font: 650 1.5rem/1.875rem "InterVariable", sans-serif; letter-spacing: -0.019em; font-variation-settings: "opsz" 24; }
+.bolt-font-heading-xs-accent { font: 650 1.25rem/1.5625rem "InterVariable", sans-serif; letter-spacing: -0.017em; font-variation-settings: "opsz" 20; }
+.bolt-font-body-l-regular    { font: 450 1.125rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.014em; font-variation-settings: "opsz" 18; }
+.bolt-font-body-l-accent     { font: 650 1.125rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.014em; font-variation-settings: "opsz" 18; }
+.bolt-font-body-m-regular    { font: 450 1rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.011em; font-variation-settings: "opsz" 16; }
+.bolt-font-body-m-accent     { font: 650 1rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.011em; font-variation-settings: "opsz" 16; }
+.bolt-font-body-s-regular    { font: 450 0.875rem/1.25rem "InterVariable", sans-serif; letter-spacing: -0.006em; font-variation-settings: "opsz" 14; }
+.bolt-font-body-s-accent     { font: 650 0.875rem/1.25rem "InterVariable", sans-serif; letter-spacing: -0.006em; font-variation-settings: "opsz" 14; }
+.bolt-font-body-xs-regular   { font: 450 0.75rem/1rem "InterVariable", sans-serif; letter-spacing: 0em; font-variation-settings: "opsz" 14; }
+.bolt-font-body-xs-accent    { font: 650 0.75rem/1rem "InterVariable", sans-serif; letter-spacing: 0em; font-variation-settings: "opsz" 14; }
+.bolt-font-caps-m-accent     { font: 650 0.875rem/1.125rem "InterVariable", sans-serif; letter-spacing: 0.074em; text-transform: uppercase; font-variation-settings: "opsz" 14; }
+.bolt-font-caps-s-accent     { font: 650 0.6875rem/0.875rem "InterVariable", sans-serif; letter-spacing: 0.08em;  text-transform: uppercase; font-variation-settings: "opsz" 14; }
+.bolt-font-tabular-m-regular { font: 450 1rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.026em; font-feature-settings: "tnum","cv03","cv04"; font-variation-settings: "opsz" 16; }
+.bolt-font-tabular-m-accent  { font: 650 1rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.026em; font-feature-settings: "tnum","cv03","cv04"; font-variation-settings: "opsz" 16; }
+
+/* ---------- Semantic HTML defaults ---------- */
+html, body { background: var(--color-layer-floor-0); color: var(--color-content-primary); }
+body {
+  font-family: "InterVariable", Inter, system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv03", "cv04", "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+h1 { font: 650 2rem/2.5rem "InterVariable", sans-serif; letter-spacing: -0.022em; margin: 0; }
+h2 { font: 650 1.75rem/2.25rem "InterVariable", sans-serif; letter-spacing: -0.02em; margin: 0; }
+h3 { font: 650 1.5rem/1.875rem "InterVariable", sans-serif; letter-spacing: -0.019em; margin: 0; }
+h4 { font: 650 1.25rem/1.5625rem "InterVariable", sans-serif; letter-spacing: -0.017em; margin: 0; }
+p  { font: 450 1rem/1.5rem "InterVariable", sans-serif; letter-spacing: -0.011em; margin: 0; }
+small { font: 450 0.875rem/1.25rem "InterVariable", sans-serif; letter-spacing: -0.006em; }
+a  { color: var(--color-content-link-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }

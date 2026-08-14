@@ -1,92 +1,44 @@
 const form = document.getElementById("filters");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
-const moreFiltersToggle = document.getElementById("moreFiltersToggle");
-const moreFiltersPanel = document.getElementById("moreFiltersPanel");
+const authStatusEl = document.getElementById("authStatus");
+const saveSearchBtn = document.getElementById("saveSearchBtn");
+const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+const gridViewBtn = document.getElementById("gridViewBtn");
+const listViewBtn = document.getElementById("listViewBtn");
+const typeToggle = document.getElementById("typeToggle");
+const typePanel = document.getElementById("typePanel");
+const typeLabel = document.getElementById("typeLabel");
+const locationToggle = document.getElementById("locationToggle");
+const locationPanel = document.getElementById("locationPanel");
+const locationLabel = document.getElementById("locationLabel");
 const tagFilterToggle = document.getElementById("tagFilterToggle");
 const tagFilterPanel = document.getElementById("tagFilterPanel");
 const tagFilterCount = document.getElementById("tagFilterCount");
-const authStatusEl = document.getElementById("authStatus");
-const saveSearchBtn = document.getElementById("saveSearchBtn");
+const notifToggle = document.getElementById("notifToggle");
+const notifPanel = document.getElementById("notifPanel");
+const notifList = document.getElementById("notifList");
+const notifDot = document.getElementById("notifDot");
+const detailModal = document.getElementById("detailModal");
+const modalClose = document.getElementById("modalClose");
+const modalBody = document.getElementById("modalBody");
 
 let selectedTags = new Set();
-let expandedIds = new Set();
 let favorites = new Set(JSON.parse(localStorage.getItem("favorites") || "[]"));
-let currentUser = null;  // null = anonymous; {id, email, created_at} once logged in
+let favoriteItems = [];           // full posting objects for favorites, used by notifications
+let currentUser = null;           // null = anonymous; {id, email, created_at} once logged in
+let paidValue = "";                // "" | "true" | "false"
+let selectedType = "";
+let selectedLocation = "";
+let typeValues = [];
+let locationValues = [];
+let viewMode = "grid";             // "grid" | "list"
+let lastResults = [];
+let lastQueryTokens = [];
+let currentResultsById = new Map();
 
 function saveFavorites() {
   localStorage.setItem("favorites", JSON.stringify([...favorites]));
-}
-
-// Anonymous visitors keep favorites in localStorage (unchanged from before);
-// once logged in, favorites live on the account instead, so this replaces
-// the local Set with what the server has and points future toggles at the
-// server API (see attachRowInteractions' fav-btn handler).
-async function checkAuth() {
-  try {
-    const res = await fetch("/api/auth/me");
-    if (!res.ok) {
-      currentUser = null;
-      authStatusEl.textContent = "Logi sisse";
-      saveSearchBtn.classList.add("hidden");
-      return;
-    }
-    currentUser = await res.json();
-    authStatusEl.textContent = currentUser.email;
-    saveSearchBtn.classList.remove("hidden");
-
-    const favRes = await fetch("/api/me/favorites");
-    if (favRes.ok) {
-      const favItems = await favRes.json();
-      favorites = new Set(favItems.map((item) => item.id));
-    }
-  } catch (err) {
-    currentUser = null;
-    authStatusEl.textContent = "Logi sisse";
-  }
-}
-
-// Pre-populates the filter form from the current URL's query params, so a
-// saved-search link (or any shared/bookmarked search URL) reproduces the
-// same filters on load instead of always starting blank.
-function applyFiltersFromUrl() {
-  const params = new URLSearchParams(location.search);
-  if (params.has("q")) form.q.value = params.get("q");
-  if (params.has("pay_specified")) {
-    const radio = form.querySelector(`input[name="pay_specified"][value="${CSS.escape(params.get("pay_specified"))}"]`);
-    if (radio) radio.checked = true;
-  }
-  if (params.has("deadline_after")) form.deadline_after.value = params.get("deadline_after");
-  if (params.has("deadline_before")) form.deadline_before.value = params.get("deadline_before");
-  for (const tag of params.getAll("tags")) selectedTags.add(tag);
-  // `type`/`location` are applied after populateFilterOptions() fills their
-  // <option> lists, otherwise the value wouldn't match any existing option.
-}
-
-function buildQuery() {
-  const params = new URLSearchParams();
-
-  const q = form.q.value.trim();
-  if (q) params.set("q", q);
-
-  const paySpecified = form.querySelector('input[name="pay_specified"]:checked').value;
-  if (paySpecified) params.set("pay_specified", paySpecified);
-
-  const type = form.type.value;
-  if (type) params.set("type", type);
-
-  const location = form.location.value;
-  if (location) params.set("location", location);
-
-  const deadlineAfter = form.deadline_after.value;
-  if (deadlineAfter) params.set("deadline_after", deadlineAfter);
-
-  const deadlineBefore = form.deadline_before.value;
-  if (deadlineBefore) params.set("deadline_before", deadlineBefore);
-
-  for (const tag of selectedTags) params.append("tags", tag);
-
-  return params;
 }
 
 function escapeHtml(str) {
@@ -113,7 +65,7 @@ function highlight(text, queryTokens) {
 function relevanceBorderColor(relevance) {
   if (relevance === null || relevance === undefined) return "transparent";
   const alpha = Math.max(0, Math.min(1, relevance));
-  return `rgba(52, 87, 213, ${alpha})`;
+  return `rgba(43, 134, 89, ${alpha})`;
 }
 
 // Whole calendar days between today and an ISO date, comparing dates only
@@ -125,9 +77,8 @@ function daysUntil(isoDate) {
   return Math.round((target - todayUtc) / 86400000);
 }
 
-// Deadline urgency: <=3 days is red, <=7 days is yellow, otherwise the
-// neutral color already used elsewhere in the UI. Rolling ("Pidev")
-// postings have no date to be urgent about, so they stay neutral.
+// Deadline urgency: <=3 days is red, <=7 days is yellow, otherwise neutral.
+// Rolling ("Pidev") postings have no date to be urgent about.
 function deadlineUrgencyClass(item) {
   if (item.deadline_rolling) return "";
   const days = daysUntil(item.deadline);
@@ -136,70 +87,87 @@ function deadlineUrgencyClass(item) {
   return "";
 }
 
-// Renders a row plus its (initially collapsed) inline detail panel, kept as
-// a sibling rather than nested so it doesn't disturb the row's own flex
-// column layout. Expand state and favorite state both persist across
-// re-renders via the module-level Sets.
-function renderRow(item, queryTokens) {
-  const payHtml = item.pay_specified
-    ? highlight(item.pay, queryTokens)
-    : `<span class="pay-unspecified">Pole märgitud</span>`;
+// No company logos in our data, so postings get a deterministic colored
+// initial-letter avatar instead (same company always gets the same color).
+function companyAvatarStyle(company) {
+  let hash = 0;
+  for (let i = 0; i < company.length; i++) hash = (hash * 31 + company.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return `background: hsl(${hue}, 45%, 40%);`;
+}
+function companyInitial(company) {
+  return (company.trim()[0] || "?").toUpperCase();
+}
 
+function payChipHtml(item, queryTokens) {
+  if (!item.pay_specified) return `<span class="chip chip-unspecified">Tasu pole märgitud</span>`;
+  return `<span class="chip chip-pay">${highlight(item.pay, queryTokens || [])}</span>`;
+}
+
+function deadlineNoteHtml(item) {
+  const cls = deadlineUrgencyClass(item);
+  const text = item.deadline_rolling ? item.deadline : `Kandideeri hiljemalt ${item.deadline}`;
+  return `<span class="deadline-note${cls}">${escapeHtml(text)}</span>`;
+}
+
+function favBtnHtml(item, extraClass) {
+  const isFavorite = favorites.has(item.id);
+  return `
+    <button type="button" class="fav-btn${isFavorite ? " favorited" : ""}${extraClass ? " " + extraClass : ""}" data-id="${escapeHtml(item.id)}" aria-label="Lisa lemmikuks">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 011 1V21l-7-4.2L5 21V4.5a1 1 0 011-1z"/></svg>
+    </button>
+  `;
+}
+
+function renderCard(item, queryTokens) {
   const relevanceHtml =
     item.relevance === null || item.relevance === undefined
       ? ""
-      : `${Math.round(item.relevance * 100)}%`;
+      : `<span class="match-badge">${Math.round(item.relevance * 100)}% sobivus</span>`;
 
-  const tagsText = item.tags.length ? item.tags.join(", ") : "—";
-  const tagsClass = item.tags.length ? "" : " no-tags";
-
-  const linkHtml = item.link
-    ? `<a class="row-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Vaata kuulutust →</a>`
-    : "";
-
-  const isFavorite = favorites.has(item.id);
-  const favHtml = `<button type="button" class="fav-btn${isFavorite ? " favorited" : ""}" data-id="${escapeHtml(item.id)}" aria-label="Lisa lemmikuks">${isFavorite ? "★" : "☆"}</button>`;
-
-  const isExpanded = expandedIds.has(item.id);
-  const tagChipsHtml = item.tags.length
-    ? item.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")
-    : `<span class="no-tags">Sildid puuduvad</span>`;
-  const keywordChipsHtml = item.keywords.length
-    ? item.keywords.map((k) => `<span class="keyword-chip">${highlight(k, queryTokens)}</span>`).join("")
-    : "";
+  const chips = [
+    item.tags[0] ? `<span class="chip">${escapeHtml(item.tags[0])}</span>` : "",
+    item.location ? `<span class="chip">${escapeHtml(item.location)}</span>` : "",
+    `<span class="chip">${escapeHtml(item.employment_type)}</span>`,
+    payChipHtml(item, queryTokens),
+  ].join("");
 
   return `
-    <div class="row" data-id="${escapeHtml(item.id)}" style="border-left-color: ${relevanceBorderColor(item.relevance)}">
-      <span class="col-favorite">${favHtml}</span>
-      <span class="col-relevance">${relevanceHtml}</span>
-      <span class="col-name">${highlight(item.name, queryTokens)}</span>
-      <span class="col-company">${highlight(item.company, queryTokens)}</span>
-      <span class="col-pay">${payHtml}</span>
-      <span class="col-type">${escapeHtml(item.employment_type)}</span>
-      <span class="col-tags${tagsClass}">${escapeHtml(tagsText)}</span>
-      <span class="col-deadline${deadlineUrgencyClass(item)}">${escapeHtml(item.deadline)}</span>
-      <span class="col-description">${highlight(item.description, queryTokens)}</span>
-      <span class="col-link">${linkHtml}</span>
+    <div class="offer-card" data-id="${escapeHtml(item.id)}" style="border-left-color: ${relevanceBorderColor(item.relevance)}">
+      ${relevanceHtml}
+      ${favBtnHtml(item)}
+      <div class="company-avatar" style="${companyAvatarStyle(item.company)}">${escapeHtml(companyInitial(item.company))}</div>
+      <div class="offer-title-wrap">
+        <div class="offer-title bolt-font-body-m-accent">${highlight(item.name, queryTokens)}</div>
+        <div class="offer-company bolt-font-body-s-regular">${highlight(item.company, queryTokens)}</div>
+      </div>
+      <div class="chip-row">${chips}</div>
+      ${deadlineNoteHtml(item)}
     </div>
-    <div class="row-details${isExpanded ? " expanded" : ""}" data-details-for="${escapeHtml(item.id)}">
-      <div class="row-details-inner">
-        <div class="row-details-content">
-          <p class="row-details-description">${highlight(item.description, queryTokens)}</p>
-          <div class="row-details-meta">
-            <span>Asukoht: ${escapeHtml(item.location) || "—"}</span>
-            <span class="${deadlineUrgencyClass(item).trim()}">Tähtaeg: ${escapeHtml(item.deadline)}</span>
-            <span>Allikas: ${escapeHtml(item.source) || "—"}</span>
-          </div>
-          <div class="row-details-group">
-            <span class="row-details-label">Sildid</span>
-            <div class="row-details-tags">${tagChipsHtml}</div>
-          </div>
-          ${keywordChipsHtml ? `
-          <div class="row-details-group">
-            <span class="row-details-label">Märksõnad</span>
-            <div class="row-details-tags">${keywordChipsHtml}</div>
-          </div>` : ""}
+  `;
+}
+
+function renderRow(item, queryTokens) {
+  const relevanceHtml =
+    item.relevance === null || item.relevance === undefined
+      ? ""
+      : `<span class="match-badge" style="position:static;">${Math.round(item.relevance * 100)}% sobivus</span>`;
+
+  return `
+    <div class="offer-row" data-id="${escapeHtml(item.id)}" style="border-left-color: ${relevanceBorderColor(item.relevance)}">
+      ${favBtnHtml(item)}
+      <div class="company-avatar" style="${companyAvatarStyle(item.company)}">${escapeHtml(companyInitial(item.company))}</div>
+      <div class="offer-main">
+        ${relevanceHtml}
+        <div class="offer-title bolt-font-body-m-accent">${highlight(item.name, queryTokens)}</div>
+        <div class="chip-row">
+          ${payChipHtml(item, queryTokens)}
+          <span class="offer-company bolt-font-body-s-regular">${highlight(item.company, queryTokens)}</span>
         </div>
+      </div>
+      <div class="offer-meta-right">
+        ${deadlineNoteHtml(item)}
+        <span class="chip">${escapeHtml(item.location)}</span>
       </div>
     </div>
   `;
@@ -215,12 +183,9 @@ const RELEVANCE_TIERS = [
   { label: "Vähem seotud", min: -Infinity, max: 0.15, collapsible: true },
 ];
 
-// With a query: bucket into relevance tiers (best/related/less related),
-// since that's what "closeness in layers" means when ranking is active.
-// Without a query: there's no relevance to tier by, so group by each
-// posting's primary (first-matched) tag instead — a browsing-friendly view
-// of "what categories exist here." Both return the same shape so rendering
-// doesn't need to care which mode produced it.
+// With a query: bucket into relevance tiers (best/related/less related).
+// Without a query: group by each posting's primary tag instead — a
+// browsing-friendly view of "what categories exist here."
 function sectionResults(items, queryActive) {
   if (queryActive) {
     return RELEVANCE_TIERS.map((tier) => ({
@@ -243,93 +208,139 @@ function sectionResults(items, queryActive) {
 
 function renderSections(items, queryTokens) {
   const sections = sectionResults(items, queryTokens.length > 0);
+  const renderItem = viewMode === "grid" ? renderCard : renderRow;
+  const containerClass = viewMode === "grid" ? "cards-grid" : "cards-list";
 
   return sections
     .map((section) => {
-      const rows = section.items.map((item) => renderRow(item, queryTokens)).join("");
+      const cards = section.items.map((item) => renderItem(item, queryTokens)).join("");
       const header = `${escapeHtml(section.label)} <span class="section-count">(${section.items.length})</span>`;
+      const body = `<div class="${containerClass}">${cards}</div>`;
 
       if (section.collapsible) {
-        return `
-          <details class="result-section">
-            <summary class="section-header">${header}</summary>
-            ${rows}
-          </details>
-        `;
+        return `<details class="result-section"><summary class="section-header">${header}</summary>${body}</details>`;
       }
-      return `
-        <div class="result-section">
-          <div class="section-header">${header}</div>
-          ${rows}
-        </div>
-      `;
+      return `<div class="result-section"><div class="section-header">${header}</div>${body}</div>`;
     })
     .join("");
 }
 
-// Wires up per-row interactions after every re-render: clicking a row
-// toggles its inline detail panel, the favorite star toggles independently
-// (without also triggering expand), and the outbound link doesn't trigger
-// expand either.
-function attachRowInteractions() {
-  resultsEl.querySelectorAll(".row[data-id]").forEach((rowEl) => {
-    rowEl.addEventListener("click", () => {
-      const id = rowEl.dataset.id;
-      const details = resultsEl.querySelector(`.row-details[data-details-for="${id}"]`);
-      if (!details) return;
-      const nowExpanded = !expandedIds.has(id);
-      if (nowExpanded) expandedIds.add(id);
-      else expandedIds.delete(id);
-      details.classList.toggle("expanded");
+async function toggleFavorite(id) {
+  const nowFavorited = !favorites.has(id);
+  if (nowFavorited) favorites.add(id);
+  else favorites.delete(id);
 
-      if (nowExpanded && currentUser) {
-        fetch("/api/me/history", {
+  if (currentUser) {
+    const request = nowFavorited
+      ? fetch("/api/me/favorites", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ internship_id: id }),
-        }).catch(() => {});
-      }
-    });
-  });
+        })
+      : fetch(`/api/me/favorites/${encodeURIComponent(id)}`, { method: "DELETE" });
+    request.catch(() => {});
+  } else {
+    saveFavorites();
+  }
 
-  resultsEl.querySelectorAll(".fav-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const id = btn.dataset.id;
-      const nowFavorited = !favorites.has(id);
-      if (nowFavorited) favorites.add(id);
-      else favorites.delete(id);
-      btn.classList.toggle("favorited", nowFavorited);
-      btn.textContent = nowFavorited ? "★" : "☆";
+  await refreshFavoriteItems();
+  return nowFavorited;
+}
 
-      if (currentUser) {
-        const request = nowFavorited
-          ? fetch("/api/me/favorites", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ internship_id: id }),
-            })
-          : fetch(`/api/me/favorites/${encodeURIComponent(id)}`, { method: "DELETE" });
-        request.catch(() => {});
-      } else {
-        saveFavorites();
-      }
-    });
-  });
+function renderModalContent(item, queryTokens) {
+  const tagChipsHtml = item.tags.length
+    ? item.tags.map((t) => `<span class="modal-chip chip">${escapeHtml(t)}</span>`).join("")
+    : `<span class="no-tags">Sildid puuduvad</span>`;
+  const keywordChipsHtml = item.keywords.length
+    ? item.keywords.map((k) => `<span class="modal-chip chip">${highlight(k, queryTokens)}</span>`).join("")
+    : "";
+  const isFavorite = favorites.has(item.id);
 
-  resultsEl.querySelectorAll(".row-link").forEach((link) => {
-    link.addEventListener("click", (e) => e.stopPropagation());
+  return `
+    <div class="modal-header">
+      <div class="company-avatar" style="${companyAvatarStyle(item.company)}">${escapeHtml(companyInitial(item.company))}</div>
+      <div>
+        <div class="bolt-font-heading-s-accent">${highlight(item.name, queryTokens)}</div>
+        <div class="modal-meta bolt-font-body-m-regular">${highlight(item.company, queryTokens)} · ${escapeHtml(item.location) || "—"}</div>
+      </div>
+    </div>
+    <div class="modal-chips">
+      ${payChipHtml(item, queryTokens)}
+      <span class="modal-chip chip">${escapeHtml(item.employment_type)}</span>
+      ${tagChipsHtml}
+      <span class="modal-chip chip" style="background:var(--color-bg-promo-secondary); color:var(--color-content-promo-primary);">Tähtaeg: ${escapeHtml(item.deadline)}</span>
+    </div>
+    <p class="modal-description">${highlight(item.description, queryTokens)}</p>
+    ${keywordChipsHtml ? `<div class="modal-keywords">${keywordChipsHtml}</div>` : ""}
+    <div class="modal-actions">
+      <a class="btn-primary" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Kandideeri</a>
+      <button type="button" class="btn-secondary" id="modalFavBtn" data-id="${escapeHtml(item.id)}">${isFavorite ? "★ Salvestatud" : "☆ Salvesta"}</button>
+    </div>
+    <div class="modal-tip">
+      <span>Ei tea, kuidas kandideerida? <a href="/guide.html">Loe meie kandideerimisjuhendit</a></span>
+    </div>
+  `;
+}
+
+function wireModalButtons(item) {
+  const modalFavBtn = modalBody.querySelector("#modalFavBtn");
+  if (!modalFavBtn) return;
+  modalFavBtn.addEventListener("click", async () => {
+    const nowFav = await toggleFavorite(item.id);
+    modalFavBtn.textContent = nowFav ? "★ Salvestatud" : "☆ Salvesta";
+    resultsEl.querySelectorAll(`.fav-btn[data-id="${item.id}"]`).forEach((b) => b.classList.toggle("favorited", nowFav));
   });
 }
 
-// Renders the tag dropdown's checkbox list from live facet counts (how many
-// of the *current* results carry each tag), preserving which tags are
-// checked across re-renders.
+function openModal(id) {
+  const item = currentResultsById.get(id);
+  if (!item) return;
+  modalBody.innerHTML = renderModalContent(item, lastQueryTokens);
+  wireModalButtons(item);
+  detailModal.classList.remove("hidden");
+
+  if (currentUser) {
+    fetch("/api/me/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internship_id: id }),
+    }).catch(() => {});
+  }
+}
+
+function closeModal() {
+  detailModal.classList.add("hidden");
+  modalBody.innerHTML = "";
+}
+
+modalClose.addEventListener("click", closeModal);
+detailModal.addEventListener("click", (e) => {
+  if (e.target === detailModal) closeModal();
+});
+
+// Wires up per-card/row interactions after every re-render: clicking a
+// card/row opens the detail modal, the favorite star toggles independently.
+function attachResultInteractions() {
+  resultsEl.querySelectorAll(".offer-card[data-id], .offer-row[data-id]").forEach((el) => {
+    el.addEventListener("click", () => openModal(el.dataset.id));
+  });
+
+  resultsEl.querySelectorAll(".fav-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const nowFav = await toggleFavorite(btn.dataset.id);
+      btn.classList.toggle("favorited", nowFav);
+    });
+  });
+}
+
+// Renders the "Valdkond" (field/tag) dropdown's checkbox list from live
+// facet counts, preserving which tags are checked across re-renders.
 function renderTagPanel(facets) {
   tagFilterCount.textContent = selectedTags.size ? ` (${selectedTags.size})` : "";
 
   if (!facets.length) {
-    tagFilterPanel.innerHTML = `<p class="tag-filter-empty">Sildid puuduvad.</p>`;
+    tagFilterPanel.innerHTML = `<p class="dropdown-empty">Valdkondi ei leitud.</p>`;
     return;
   }
 
@@ -337,10 +348,10 @@ function renderTagPanel(facets) {
     .map(({ tag, count }) => {
       const checked = selectedTags.has(tag) ? "checked" : "";
       return `
-        <label class="tag-option">
+        <label class="dropdown-option">
           <input type="checkbox" value="${escapeHtml(tag)}" ${checked}>
-          <span class="tag-option-label">${escapeHtml(tag)}</span>
-          <span class="tag-option-count">(${count})</span>
+          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(tag)}</span>
+          <span class="dropdown-option-count">${count}</span>
         </label>
       `;
     })
@@ -355,11 +366,78 @@ function renderTagPanel(facets) {
   });
 }
 
+function renderSingleSelectPanel(panel, values, current, onSelect) {
+  const allOption = `<div class="dropdown-option${current === "" ? " active" : ""}" data-value="">Kõik</div>`;
+  const opts = values.map(
+    (v) => `<div class="dropdown-option${v === current ? " active" : ""}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`
+  );
+  panel.innerHTML = [allOption, ...opts].join("");
+  panel.querySelectorAll(".dropdown-option").forEach((el) => {
+    el.addEventListener("click", () => onSelect(el.dataset.value));
+  });
+}
+
+function renderTypePanel() {
+  renderSingleSelectPanel(typePanel, typeValues, selectedType, (v) => {
+    selectedType = v;
+    typeLabel.textContent = v || "Kõik";
+    renderTypePanel();
+    closeAllDropdowns();
+    runSearch();
+  });
+}
+
+function renderLocationPanel() {
+  renderSingleSelectPanel(locationPanel, locationValues, selectedLocation, (v) => {
+    selectedLocation = v;
+    locationLabel.textContent = v || "Kõik";
+    renderLocationPanel();
+    closeAllDropdowns();
+    runSearch();
+  });
+}
+
+function hasActiveFilters() {
+  return Boolean(
+    form.q.value.trim() ||
+      paidValue ||
+      selectedType ||
+      selectedLocation ||
+      form.deadline_after.value ||
+      form.deadline_before.value ||
+      selectedTags.size
+  );
+}
+
+function updateClearFiltersVisibility() {
+  clearFiltersBtn.classList.toggle("hidden", !hasActiveFilters());
+}
+
+function buildQuery() {
+  const params = new URLSearchParams();
+
+  const q = form.q.value.trim();
+  if (q) params.set("q", q);
+  if (paidValue) params.set("pay_specified", paidValue);
+  if (selectedType) params.set("type", selectedType);
+  if (selectedLocation) params.set("location", selectedLocation);
+
+  const deadlineAfter = form.deadline_after.value;
+  if (deadlineAfter) params.set("deadline_after", deadlineAfter);
+  const deadlineBefore = form.deadline_before.value;
+  if (deadlineBefore) params.set("deadline_before", deadlineBefore);
+
+  for (const tag of selectedTags) params.append("tags", tag);
+
+  return params;
+}
+
 async function runSearch() {
   const params = buildQuery();
   const queryString = params.toString();
-  const queryTokens = form.q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  lastQueryTokens = form.q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   statusEl.textContent = "Otsin…";
+  updateClearFiltersVisibility();
 
   try {
     const [searchRes, facetsRes] = await Promise.all([
@@ -374,9 +452,13 @@ async function runSearch() {
       return;
     }
 
+    lastResults = body;
+    currentResultsById = new Map(body.map((item) => [item.id, item]));
     statusEl.textContent = `${body.length} ${pluralize(body.length)}`;
-    resultsEl.innerHTML = renderSections(body, queryTokens);
-    attachRowInteractions();
+    resultsEl.innerHTML = body.length
+      ? renderSections(body, lastQueryTokens)
+      : `<div class="dropdown-empty" style="padding:48px 24px; text-align:center; background:var(--color-layer-floor-1); border-radius:var(--corner-radius-l);">Ühtegi praktikat ei leitud sinu filtritega.</div>`;
+    attachResultInteractions();
 
     if (facetsRes.ok) {
       const facetsBody = await facetsRes.json();
@@ -388,78 +470,79 @@ async function runSearch() {
   }
 }
 
-// Populates the "Tööaeg" and "Asukoht" dropdowns from whatever values
-// actually appear in the data (one shared fetch), instead of hardcoding
-// enums that would drift out of sync with the CSV.
+function setViewMode(mode) {
+  viewMode = mode;
+  gridViewBtn.classList.toggle("active", mode === "grid");
+  listViewBtn.classList.toggle("active", mode === "list");
+  if (lastResults.length) {
+    resultsEl.innerHTML = renderSections(lastResults, lastQueryTokens);
+    attachResultInteractions();
+  }
+}
+gridViewBtn.addEventListener("click", () => setViewMode("grid"));
+listViewBtn.addEventListener("click", () => setViewMode("list"));
+
+// Populates the "Tööaeg"/"Asukoht" dropdowns from whatever values actually
+// appear in the data, instead of hardcoding enums. Also seeds selection from
+// the URL's query params (for saved-search links) since the option lists
+// need to exist before a value can be marked active.
 async function populateFilterOptions() {
   try {
     const res = await fetch("/api/internships");
     const items = await res.json();
-
-    const fill = (select, values) => {
-      for (const value of [...new Set(values)].sort()) {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = value;
-        select.appendChild(option);
-      }
-    };
-
-    fill(form.type, items.map((item) => item.employment_type));
-    fill(form.location, items.map((item) => item.location));
+    typeValues = [...new Set(items.map((item) => item.employment_type))].sort();
+    locationValues = [...new Set(items.map((item) => item.location))].sort();
 
     const params = new URLSearchParams(location.search);
-    if (params.has("type")) form.type.value = params.get("type");
-    if (params.has("location")) form.location.value = params.get("location");
+    if (params.has("type")) selectedType = params.get("type");
+    if (params.has("location")) selectedLocation = params.get("location");
+
+    typeLabel.textContent = selectedType || "Kõik";
+    locationLabel.textContent = selectedLocation || "Kõik";
+    renderTypePanel();
+    renderLocationPanel();
   } catch (err) {
-    // Non-fatal: dropdowns just stay at "Kõik" if this fails.
+    // Non-fatal: dropdowns just stay empty if this fails.
   }
 }
 
-function setupDropdown(toggle, panel) {
-  toggle.addEventListener("click", () => {
-    const opening = panel.classList.contains("hidden");
-    panel.classList.toggle("hidden");
-    toggle.setAttribute("aria-expanded", String(opening));
+function applyFiltersFromUrl() {
+  const params = new URLSearchParams(location.search);
+  if (params.has("q")) form.q.value = params.get("q");
+  if (params.has("pay_specified")) {
+    paidValue = params.get("pay_specified");
+    document.querySelectorAll("#paidSegmented .segmented-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.value === paidValue);
+    });
+  }
+  if (params.has("deadline_after")) form.deadline_after.value = params.get("deadline_after");
+  if (params.has("deadline_before")) form.deadline_before.value = params.get("deadline_before");
+  for (const tag of params.getAll("tags")) selectedTags.add(tag);
+}
+
+document.querySelectorAll("#paidSegmented .segmented-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    paidValue = btn.dataset.value;
+    document.querySelectorAll("#paidSegmented .segmented-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    runSearch();
   });
-}
-
-setupDropdown(moreFiltersToggle, moreFiltersPanel);
-setupDropdown(tagFilterToggle, tagFilterPanel);
-
-document.addEventListener("click", (e) => {
-  for (const [toggle, panel] of [
-    [moreFiltersToggle, moreFiltersPanel],
-    [tagFilterToggle, tagFilterPanel],
-  ]) {
-    if (panel.classList.contains("hidden")) continue;
-    if (panel.contains(e.target) || toggle.contains(e.target)) continue;
-    panel.classList.add("hidden");
-    toggle.setAttribute("aria-expanded", "false");
-  }
 });
 
-// No submit button anymore — Enter in the search box still submits the
-// form, so this stays as the handler for that; every other control runs
-// the search itself as soon as it changes.
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
+clearFiltersBtn.addEventListener("click", () => {
+  form.q.value = "";
+  paidValue = "";
+  selectedType = "";
+  selectedLocation = "";
+  selectedTags.clear();
+  form.deadline_after.value = "";
+  form.deadline_before.value = "";
+  document.querySelectorAll("#paidSegmented .segmented-btn").forEach((b) => b.classList.toggle("active", b.dataset.value === ""));
+  typeLabel.textContent = "Kõik";
+  locationLabel.textContent = "Kõik";
+  renderTypePanel();
+  renderLocationPanel();
   runSearch();
 });
-
-let searchDebounce;
-form.q.addEventListener("input", () => {
-  clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(runSearch, 250);
-});
-
-for (const radio of form.querySelectorAll('input[name="pay_specified"]')) {
-  radio.addEventListener("change", runSearch);
-}
-form.type.addEventListener("change", runSearch);
-form.location.addEventListener("change", runSearch);
-form.deadline_after.addEventListener("change", runSearch);
-form.deadline_before.addEventListener("change", runSearch);
 
 saveSearchBtn.addEventListener("click", async () => {
   const name = prompt("Anna otsingule nimi:");
@@ -480,6 +563,141 @@ saveSearchBtn.addEventListener("click", async () => {
     alert(`Salvestamine ebaõnnestus: ${err.message}`);
   }
 });
+
+// ---------- Notifications: computed client-side from favorited postings'
+// deadlines. No backend support needed — favorites already carry deadline
+// data, so this is just filtering/sorting what we already have. ----------
+
+async function refreshFavoriteItems() {
+  try {
+    if (currentUser) {
+      const res = await fetch("/api/me/favorites");
+      favoriteItems = res.ok ? await res.json() : [];
+      favorites = new Set(favoriteItems.map((item) => item.id));
+    } else if (favorites.size) {
+      const res = await fetch("/api/internships");
+      const all = res.ok ? await res.json() : [];
+      favoriteItems = all.filter((item) => favorites.has(item.id));
+    } else {
+      favoriteItems = [];
+    }
+  } catch (err) {
+    favoriteItems = [];
+  }
+  updateNotifications();
+}
+
+function updateNotifications() {
+  const upcoming = favoriteItems
+    .filter((item) => !item.deadline_rolling && daysUntil(item.deadline) <= 7 && daysUntil(item.deadline) >= 0)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+  notifDot.classList.toggle("hidden", upcoming.length === 0);
+
+  if (!upcoming.length) {
+    notifList.innerHTML = `<div class="notif-empty bolt-font-body-s-regular">Praegu pole teavitusi.</div>`;
+    return;
+  }
+
+  notifList.innerHTML =
+    `<div class="bolt-font-caps-s-accent" style="color:var(--color-content-tertiary); padding:8px 8px 2px;">Lähenevad tähtajad</div>` +
+    upcoming
+      .map(
+        (item) => `
+      <a href="#" class="notif-item" data-id="${escapeHtml(item.id)}">
+        <div class="company-avatar" style="width:26px; height:26px; font-size:0.7rem; ${companyAvatarStyle(item.company)}">${escapeHtml(companyInitial(item.company))}</div>
+        <div class="notif-item-body">
+          <div class="notif-item-title bolt-font-body-s-accent">${escapeHtml(item.name)}</div>
+          <div class="bolt-font-body-xs-regular deadline-note${deadlineUrgencyClass(item)}">${escapeHtml(item.deadline)}</div>
+        </div>
+      </a>
+    `
+      )
+      .join("");
+
+  notifList.querySelectorAll(".notif-item").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeAllDropdowns();
+      const item = favoriteItems.find((f) => f.id === el.dataset.id);
+      if (item) {
+        currentResultsById.set(item.id, item);
+        openModal(item.id);
+      }
+    });
+  });
+}
+
+// ---------- Dropdown open/close (shared: type/location/field/notifications) ----------
+
+const DROPDOWNS = [
+  [typeToggle, typePanel],
+  [tagFilterToggle, tagFilterPanel],
+  [locationToggle, locationPanel],
+  [notifToggle, notifPanel],
+];
+
+function closeAllDropdowns() {
+  for (const [toggle, panel] of DROPDOWNS) {
+    panel.classList.add("hidden");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+}
+
+DROPDOWNS.forEach(([toggle, panel]) => {
+  toggle.addEventListener("click", () => {
+    const opening = panel.classList.contains("hidden");
+    closeAllDropdowns();
+    if (opening) {
+      panel.classList.remove("hidden");
+      toggle.setAttribute("aria-expanded", "true");
+    }
+  });
+});
+
+document.addEventListener("click", (e) => {
+  for (const [toggle, panel] of DROPDOWNS) {
+    if (panel.classList.contains("hidden")) continue;
+    if (panel.contains(e.target) || toggle.contains(e.target)) continue;
+    panel.classList.add("hidden");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+});
+
+// No submit button — Enter in the search box still submits the form, so
+// this stays as the handler for that; every other control runs the search
+// itself as soon as it changes.
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  runSearch();
+});
+
+let searchDebounce;
+form.q.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runSearch, 250);
+});
+form.deadline_after.addEventListener("change", runSearch);
+form.deadline_before.addEventListener("change", runSearch);
+
+async function checkAuth() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (res.ok) {
+      currentUser = await res.json();
+      authStatusEl.textContent = currentUser.email;
+      saveSearchBtn.classList.remove("hidden");
+    } else {
+      currentUser = null;
+      authStatusEl.textContent = "Logi sisse";
+      saveSearchBtn.classList.add("hidden");
+    }
+  } catch (err) {
+    currentUser = null;
+    authStatusEl.textContent = "Logi sisse";
+  }
+  await refreshFavoriteItems();
+}
 
 applyFiltersFromUrl();
 checkAuth().then(() => populateFilterOptions().then(runSearch));

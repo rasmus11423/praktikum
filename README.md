@@ -377,37 +377,88 @@ task needed for this simple a rule. See `InternshipStore::active_items()` in
 
 ## Test frontend
 
-`public/index.html` + `public/js/app.js` is a plain-JS (no framework), fully Estonian-language page for manually exercising search. The search box is the dominant, centered element; filters live in two dropdowns flanking it rather than a row of separate controls:
+Plain HTML/CSS/JS (no framework), fully Estonian-language, four pages served
+statically from `public/` by the same backend: `/` (search/browse),
+`/profile.html` (account), `/guide.html` (static application advice), plus
+shared `css/design-system.css` + `css/style.css`.
 
-- **Filtrid** (left): the "Tasu" pay filter (Kõik / Tasu märgitud / Pole märgitud), the "Tööaeg" dropdown, an "Asukoht" (location) dropdown, and a "Tähtaeg" deadline range — all consolidated into one panel, "Tööaeg"/"Asukoht" both populated dynamically from the loaded data.
-- **Sildid** (right): the tag checkbox panel with live facet counts, unchanged from before except it now opens downward instead of upward.
+### Design system
 
-There's no "Otsi"/"Lähtesta" button anymore — search runs automatically: the search box re-searches on a short debounce as you type, every other control re-searches immediately on change, and pressing Enter in the search box still works too (the `<form>` submit handler is still there, just without a visible button).
+The visual design (colors, typography, spacing/radius/shadow tokens) was
+ported from a Claude-generated design draft — a set of `.dc.html` mockups
+built with a proprietary prototyping tool (custom `<x-dc>` template tags
+bound to a bundled React runtime) that aren't portable code themselves, but
+included a genuinely reusable plain-CSS token file. `public/css/design-system.css`
+is that file, adapted from the source's manual `[data-mode="dark"]` attribute
+to this project's existing `@media (prefers-color-scheme: dark)` convention.
+Self-hosted Inter Variable font files live in `public/fonts/` (no external
+font CDN). `public/css/style.css` holds the actual component styles (header,
+search panel, cards, dropdowns, modal, etc.) built on top of those tokens.
 
-Results render as a single-line horizontal row per posting (not a card grid) — a favorite-star toggle, relevance badge, name, company, pay, employment type, tags, deadline, a truncated description, and a link out to the original posting. Clicking anywhere on a row (other than the star or the outbound link) expands an inline panel below it with the full description, location/deadline/source, tag chips, and keyword chips — a CSS grid-based collapse/expand animation, no layout-measuring JS needed. Keywords in the expanded panel get the same query-match highlighting as the compact row's name/company/description, since an English search term will often only match there. There's no dedicated "favorites only" filter yet, just the per-row toggle.
+The mockup itself envisioned a much bigger product — an employer dashboard
+for posting/managing jobs, a drag-and-drop application-tracking kanban board,
+and a profile-based "% match" recommendation engine. None of that was built:
+it needs backend concepts this project doesn't have (employer accounts, an
+applications data model, declared-major matching) and wasn't asked for.
+What *did* carry over from the mockup: the browse/search page's visual
+language, wired to our real data — our tags become the "field" filter, and
+our existing `relevance` score becomes the "% match" badge, not a fabricated
+number.
 
-**Signed out**, the favorite star persists to `localStorage` (per-browser, as before) and the header shows a "Logi sisse" link. **Signed in** (see below), the star instead calls the account's favorites API directly, expanding a row records it in your recently-viewed history, and a "☆ Salvesta otsing" button appears next to the search bar to save the current filter combination as a named preset — the header link switches to your email, linking to the profile page.
+### Search / browse page (`/`)
+
+A hero banner sits above a floating search panel: a full-width search input,
+plus standalone filter controls (not one consolidated dropdown) — a "Tasu"
+segmented control (Kõik / Tasustatud / Tasustamata), "Tööaeg" and "Asukoht"
+single-select dropdowns (populated dynamically from the loaded data), a
+"Valdkond" (tag) checkbox dropdown with live facet counts, and a "Tähtaeg"
+date range. Every control re-searches immediately on change; the search box
+debounces briefly as you type. There's no visible submit button, but Enter
+in the search box still works via the form's submit handler.
+
+Results render as **cards (grid) or rows (list)**, toggled via the icons
+above the results — same underlying data, two layouts. Since there are no
+company logos in the data, each posting gets a deterministic colored
+initial-letter avatar (same company always gets the same color, computed
+client-side by hashing the name). Clicking a card/row (other than the
+favorite star) opens a **detail modal** with the full description, all tag
+and keyword chips (keyword chips get the same query-match highlighting as
+the card text, since an English search term will often only match there), a
+"Kandideeri" button linking to the real posting URL, and a favorite toggle —
+this replaces the previous inline expand-row, since that doesn't work in
+grid view.
+
+Results are still grouped into sections (relevance tiers when a query is
+active, tag groups when browsing), and the deadline is still color-coded by
+urgency (red ≤3 days, yellow ≤7 days) — both unchanged in logic from before,
+just restyled. See "Default order: soonest deadline first" and "How `q`
+ranking works" above for the underlying rules.
+
+**Notifications** (the bell icon, top right) are new: a badge dot appears
+when any of *your* favorited postings has a deadline within 7 days. This is
+computed entirely client-side from data already available (your favorites'
+`deadline`/`deadline_rolling` fields) — no new backend endpoint. Signed out,
+it works off the same `localStorage` favorites as before; signed in, off the
+account's real favorites.
+
+Signed in, a "☆ Salvesta otsing" button appears to save the current filter
+combination as a named preset, and the header link shows your email instead
+of "Logi sisse". Favoriting calls the account API directly instead of
+`localStorage` once signed in.
 
 ### Profile page (`/profile.html`)
 
-Signed out, it's a login/register form (email + password, 8+ characters).
-Signed in, it shows: your email and account creation date with a log-out
-button; a CV section that's a **UI-only placeholder** (disabled file input,
-nothing actually uploads yet); your favorited postings (each removable);
-your saved search presets (each a link back to `/?<query>` that reproduces
-those filters, since the main page seeds its filter state from the URL on
-load — plus each is deletable); and your 20 most recently viewed postings.
-All of this reads from the `/api/me/*` endpoints documented above.
+Unchanged in substance from before, restyled to match: signed out, a
+login/register form; signed in, your email + account creation date with a
+log-out button, a CV section that's a **UI-only placeholder** (disabled file
+input, nothing actually uploads), your favorited postings (removable), your
+saved search presets (each a link back to `/?<query>` that reproduces those
+filters — the main page seeds its filter state from the URL on load — and
+deletable), and your 20 most recently viewed postings. All from the
+`/api/me/*` endpoints documented above.
 
-When a keyword search is active: each row gets a percentage badge and a left-edge color tint proportional to its `relevance` score (closeness as layers, at a glance), and matched query words are bolded (`<mark>`) directly inside the name/company/pay/description text, so you can see *why* a result ranked where it did, not just trust the number.
+### Application guide (`/guide.html`)
 
-The deadline column (and the expanded panel's "Tähtaeg" line) is color-coded by urgency, computed client-side from `deadline`/`deadline_rolling`: 3 days or less is highlighted red, 7 days or less is yellow, anything further out (or a rolling/"Pidev" posting) stays the neutral color used everywhere else. Combined with the soonest-deadline-first default order, the postings that need action soonest are both first in the list and visually flagged.
-
-Rows are also grouped into sections, computed client-side in `public/js/app.js` from the `relevance`/`tags` already in each `/api/search` result — no extra backend call:
-
-- **With a query active:** three relevance tiers — "Parimad vasted" (≥ 0.5), "Seotud" (0.15–0.5), and "Vähem seotud" (< 0.15, collapsed by default behind a native `<details>` disclosure, since that tier is the most likely to just be noise on a specific query).
-- **Browsing with no query:** grouped by each posting's primary tag (its first matched tag; taglessones land in "Muu"), sections ordered largest-first — a quick view of what categories exist in the current filter set.
-
-The 0.5 / 0.15 tier cutoffs are hand-picked against this sample dataset's actual score spread, not derived from anything principled — expect to retune them if the postings or ranking algorithm change enough to shift the distribution.
-
-It's served at `/` by the same backend and talks to `/api/search` via `fetch`. This is a throwaway test harness — the real frontend is a separate future project.
+Static content — CV-writing and motivation-letter advice, and what each
+interview stage actually evaluates — adapted and translated from the
+mockup's Application Guide page. No backend involvement at all.

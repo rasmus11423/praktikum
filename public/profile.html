@@ -3,18 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Minu leht — Praktikakohtade otsing</title>
+  <title>Minu leht — Praktikaportaal</title>
+  <link rel="stylesheet" href="/css/design-system.css">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/profile.css">
 </head>
 <body>
-  <header class="header-top">
-    <div>
-      <h1><a href="/" class="plain-link">Praktikakohtade otsing</a> — Minu leht</h1>
-      <p class="subtitle">Profiil, lemmikud, salvestatud otsingud ja hiljuti vaadatud kuulutused.</p>
-    </div>
+  <header class="site-header">
+    <a href="/" class="brand bolt-font-heading-xs-accent">Praktikaportaal</a>
+    <nav class="site-nav">
+      <a href="/" class="bolt-font-body-s-accent">Sirvi praktikaid</a>
+      <a href="/guide.html" class="bolt-font-body-s-accent">Juhend</a>
+    </nav>
+    <div class="header-actions"></div>
   </header>
 
   <main class="profile-main">
+    <div class="profile-intro">
+      <h1 class="bolt-font-heading-l-accent">Minu leht</h1>
+      <p class="bolt-font-body-m-regular profile-intro-sub">Profiil, lemmikud, salvestatud otsingud ja hiljuti vaadatud kuulutused.</p>
+    </div>
+
     <div id="authForms" class="auth-forms">
       <div class="auth-tabs">
         <button type="button" id="tabLogin" class="auth-tab active">Logi sisse</button>
@@ -22,48 +31,48 @@
       </div>
 
       <form id="loginForm" class="auth-form">
-        <label>E-post <input type="email" name="email" required autocomplete="email"></label>
-        <label>Parool <input type="password" name="password" required autocomplete="current-password"></label>
-        <button type="submit">Logi sisse</button>
+        <label class="field-label"><span class="bolt-font-caps-s-accent">E-post</span><input type="email" name="email" required autocomplete="email"></label>
+        <label class="field-label"><span class="bolt-font-caps-s-accent">Parool</span><input type="password" name="password" required autocomplete="current-password"></label>
+        <button type="submit" class="btn-primary">Logi sisse</button>
         <p class="auth-error" id="loginError"></p>
       </form>
 
       <form id="registerForm" class="auth-form hidden">
-        <label>E-post <input type="email" name="email" required autocomplete="email"></label>
-        <label>Parool (vähemalt 8 tähemärki) <input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
-        <button type="submit">Loo konto</button>
+        <label class="field-label"><span class="bolt-font-caps-s-accent">E-post</span><input type="email" name="email" required autocomplete="email"></label>
+        <label class="field-label"><span class="bolt-font-caps-s-accent">Parool (vähemalt 8 tähemärki)</span><input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+        <button type="submit" class="btn-primary">Loo konto</button>
         <p class="auth-error" id="registerError"></p>
       </form>
     </div>
 
     <div id="profileContent" class="hidden">
       <section class="profile-section">
-        <h2>Profiil</h2>
-        <p>E-post: <strong id="profileEmail"></strong></p>
-        <p>Konto loodud: <span id="profileCreated"></span></p>
-        <button type="button" id="logoutBtn">Logi välja</button>
+        <h2 class="bolt-font-body-s-accent">Profiil</h2>
+        <p class="bolt-font-body-m-regular">E-post: <strong id="profileEmail"></strong></p>
+        <p class="bolt-font-body-s-regular profile-created">Konto loodud: <span id="profileCreated"></span></p>
+        <button type="button" id="logoutBtn" class="btn-secondary">Logi välja</button>
       </section>
 
       <section class="profile-section">
-        <h2>CV</h2>
+        <h2 class="bolt-font-body-s-accent">CV</h2>
         <div class="cv-placeholder">
-          <p>CV üleslaadimine tuleb peagi — see on hetkel ainult paigutus.</p>
+          <p class="bolt-font-body-s-regular">CV üleslaadimine tuleb peagi — see on hetkel ainult paigutus.</p>
           <input type="file" disabled>
         </div>
       </section>
 
       <section class="profile-section">
-        <h2>Lemmikud</h2>
+        <h2 class="bolt-font-body-s-accent">Lemmikud</h2>
         <div id="favoritesList" class="mini-list"></div>
       </section>
 
       <section class="profile-section">
-        <h2>Salvestatud otsingud</h2>
+        <h2 class="bolt-font-body-s-accent">Salvestatud otsingud</h2>
         <div id="searchesList" class="mini-list"></div>
       </section>
 
       <section class="profile-section">
-        <h2>Hiljuti vaadatud</h2>
+        <h2 class="bolt-font-body-s-accent">Hiljuti vaadatud</h2>
         <div id="historyList" class="mini-list"></div>
       </section>
     </div>
