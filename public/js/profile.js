@@ -55,7 +55,7 @@ function renderSearchRow(s) {
   return `
     <div class="mini-row">
       <div class="mini-row-main">
-        <a href="/?${s.query}" class="mini-row-name">${escapeHtml(s.name)}</a>
+        <a href="./?${s.query}" class="mini-row-name">${escapeHtml(s.name)}</a>
         <span class="mini-row-company">salvestatud ${escapeHtml(s.created_at.slice(0, 10))}</span>
       </div>
       <button type="button" class="mini-remove" data-id="${escapeHtml(s.id)}" data-action="delete-search">Kustuta</button>
@@ -112,7 +112,7 @@ function renderHistory(allItems) {
 }
 
 async function loadAllItems() {
-  const res = await fetch("/data/internships.json");
+  const res = await fetch("data/internships.json");
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }

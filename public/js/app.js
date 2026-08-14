@@ -265,7 +265,7 @@ function renderModalContent(item, queryTokens) {
       <button type="button" class="btn-secondary" id="modalFavBtn" data-id="${escapeHtml(item.id)}">${isFavorite ? "★ Salvestatud" : "☆ Salvesta"}</button>
     </div>
     <div class="modal-tip">
-      <span>Ei tea, kuidas kandideerida? <a href="/guide.html">Loe meie kandideerimisjuhendit</a></span>
+      <span>Ei tea, kuidas kandideerida? <a href="guide.html">Loe meie kandideerimisjuhendit</a></span>
     </div>
   `;
 }
@@ -624,7 +624,7 @@ form.deadline_after.addEventListener("change", runSearch);
 form.deadline_before.addEventListener("change", runSearch);
 
 async function loadAllItems() {
-  const res = await fetch("/data/internships.json");
+  const res = await fetch("data/internships.json");
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   ALL_ITEMS = await res.json();
 }
