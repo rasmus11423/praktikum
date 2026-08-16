@@ -55,7 +55,7 @@ function renderSearchRow(s) {
   return `
     <div class="mini-row">
       <div class="mini-row-main">
-        <a href="./?${s.query}" class="mini-row-name">${escapeHtml(s.name)}</a>
+        <a href="./?${escapeHtml(s.query)}" class="mini-row-name">${escapeHtml(s.name)}</a>
         <span class="mini-row-company">salvestatud ${escapeHtml(s.created_at.slice(0, 10))}</span>
       </div>
       <button type="button" class="mini-remove" data-id="${escapeHtml(s.id)}" data-action="delete-search">Kustuta</button>
@@ -77,6 +77,7 @@ function renderFavorites(allItems) {
       const current = loadFavoriteIds();
       current.delete(btn.dataset.id);
       saveFavoriteIds(current);
+      SupabaseSync?.syncFavorite(btn.dataset.id, false);
       renderFavorites(allItems);
     });
   });
@@ -93,6 +94,7 @@ function renderSearches() {
   el.querySelectorAll('[data-action="delete-search"]').forEach((btn) => {
     btn.addEventListener("click", () => {
       deleteSavedSearch(btn.dataset.id);
+      SupabaseSync?.syncSavedSearchDelete(btn.dataset.id);
       renderSearches();
     });
   });
@@ -117,14 +119,25 @@ async function loadAllItems() {
   return res.json();
 }
 
+let cachedAllItems = [];
+
+function renderAll(allItems) {
+  renderFavorites(allItems);
+  renderSearches();
+  renderHistory(allItems);
+}
+
 loadAllItems()
   .then((allItems) => {
-    renderFavorites(allItems);
-    renderSearches();
-    renderHistory(allItems);
+    cachedAllItems = allItems;
+    renderAll(allItems);
   })
   .catch((err) => {
     document.getElementById("favoritesList").innerHTML = `<p class="mini-empty">Laadimine ebaõnnestus: ${escapeHtml(err.message)}</p>`;
     document.getElementById("historyList").innerHTML = "";
     renderSearches();
   });
+
+// Fired by supabase-sync.js after a login merge or logout, since those
+// change localStorage out from under whatever was already rendered here.
+window.addEventListener("supabase-data-changed", () => renderAll(cachedAllItems));

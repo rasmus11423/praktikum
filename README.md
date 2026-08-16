@@ -26,6 +26,8 @@ a search/filter JSON API, plus a full frontend served from the same process.
 /public           frontend (html/css/js), served at "/" by the C++ server locally,
                    or as a plain static site in production
 /public/data      internships.json snapshot (generated, gitignored — see "Static hosting")
+/supabase         schema.sql — Postgres schema + RLS policies for the static site's
+                   Supabase-backed accounts (see "Accounts on the static site (Supabase)")
 /scripts          generate_static_data.sh
 /.github/workflows deploy.yml (builds + deploys the static site to GitHub Pages)
 /docker           Dockerfile, docker-compose.yml
@@ -388,8 +390,101 @@ something production depends on.
   else (ranking, filtering, faceting) against that in-memory array; there are
   no other network requests after that.
 - **Favorites, saved searches, recently-viewed** all live in the browser's
-  `localStorage` (see `search-engine.js`'s `LS_KEYS`), scoped to one browser
-  on one device — there's no account, so nothing syncs across devices.
+  `localStorage` (see `search-engine.js`'s `LS_KEYS`) by default, scoped to
+  one browser on one device. If the visitor logs in (see "Accounts on the
+  static site (Supabase)" below), the same data also syncs to their account
+  and follows them to other devices/browsers.
+
+### Accounts on the static site (Supabase)
+
+The static site has its own real accounts, separate from the C++ backend's
+local-dev-only `UserStore` described in "Accounts" above — that one only
+exists when running `./build/internship_server` locally and doesn't run
+anywhere in production. This is the one that actually works on the live
+site: sign-up/login/logout and per-account favorites/saved
+searches/recently-viewed, backed by [Supabase](https://supabase.com) (Auth +
+Postgres), called directly from the browser via `supabase-js`. No backend
+server is involved — it works on GitHub Pages exactly like everything else
+described in "Static hosting" above.
+
+**Why client-side, not through the C++ backend:** the site is deployed as
+static files with no server in production, and Supabase's JS client is
+designed to be called straight from the browser — Postgres access is gated
+by Row Level Security (RLS) policies instead of server-side code. See
+`supabase/schema.sql`'s comments for the full security model.
+
+**Files involved:**
+- `supabase/schema.sql` — the Postgres schema (`favorites`, `saved_searches`,
+  `recently_viewed` tables) and RLS policies. Run once in the Supabase
+  dashboard's SQL Editor; safe to re-run.
+- `public/js/supabase-client.js` — client init + low-level Auth/DB calls.
+  Holds the two values you need to fill in after creating a Supabase
+  project (Project Settings → API): `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+  The anon key is meant to be public/client-side-safe by design — it grants
+  nothing on its own, RLS does the actual gating. Until both are filled in
+  (they start as `"YOUR_..."` placeholders), the auth UI shows a "Supabase
+  pole veel seadistatud" notice instead of a working login form.
+- `public/js/supabase-sync.js` — bridges Supabase to `search-engine.js`'s
+  `localStorage` helpers: `localStorage` stays the fast synchronous cache
+  `app.js`/`profile.js` render from directly (so neither needed an async
+  rewrite), mirrored to Supabase in the background while logged in. On
+  login, it does a one-time pull-and-merge so data from a previous session,
+  or from browsing anonymously before logging in, isn't lost.
+- `public/js/auth-ui.js` — the login/signup/logout UI itself (an
+  email+password form in a modal, wired into the `#authWidget` container in
+  both `index.html` and `profile.html`'s header).
+- The Supabase client library itself isn't vendored — it's loaded via a
+  pinned, integrity-checked CDN `<script>` tag (exact version + `sha384`
+  hash, not a floating `@2`) in both `index.html` and `profile.html`, so a
+  compromised CDN/package can't silently swap in malicious code.
+
+**Setup:**
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the dashboard's **SQL Editor**, paste in and run `supabase/schema.sql`.
+3. In **Project Settings → API**, copy the **Project URL** and **anon
+   public** key into `SUPABASE_URL`/`SUPABASE_ANON_KEY` at the top of
+   `public/js/supabase-client.js`.
+4. By default Supabase requires email confirmation before a new sign-up can
+   log in (the UI shows a "check your email" notice after registering) — to
+   turn that off for faster local testing, **Authentication → Providers →
+   Email → Confirm email** toggle in the dashboard.
+5. Reload the site — the header's "Logi sisse" button now works.
+6. In **Project Settings → Data API → Security**, leave **Enable Data API**
+   on (required for any of this to work), leave **Automatically expose new
+   tables** off, and turn on **Enable automatic RLS**. Neither of the latter
+   two affects the three tables above (`schema.sql` already handles their
+   grants/RLS explicitly) — they're just a safety net for any table added
+   later, so a future one can't end up world-readable/writable by accident.
+
+This project's `supabase-client.js` already has real values filled in, and
+email confirmation is currently **off** (step 4, for faster testing) — turn
+it back on, and add the real production URL to **Authentication → URL
+Configuration → Redirect URLs**, before real users start signing up.
+
+**A gotcha already hit and fixed:** `favorites` only grants
+`select`/`insert`/`delete` to the `authenticated` role — a favorite is
+either present or absent, never "updated". Calling `.upsert()` without
+`ignoreDuplicates: true` compiles to `INSERT ... ON CONFLICT DO UPDATE`,
+which also needs `UPDATE` privilege; without it, writes failed with a bare
+"permission denied for table favorites" (Postgres `42501`) — easy to
+misread as an RLS-policy bug when it's actually a missing grant.
+`supabase-client.js`'s `addFavoriteRemote` uses `ignoreDuplicates: true`
+(→ `ON CONFLICT DO NOTHING`) specifically so it only ever needs `INSERT`.
+
+**Another one:** `saved_searches.query` is user-controlled and round-trips
+through Supabase, so `public/js/profile.js`'s `renderSearchRow` escapes it
+with `escapeHtml()` before using it in an `href` — an unescaped
+interpolation there would let a crafted query string break out of the
+attribute. Only ever exploitable against the querying user's own account
+(RLS limits reads to `auth.uid() = user_id`), but cheap to close regardless.
+
+**Load performance:** all six `<script>` tags (the CDN one plus the five
+local files) use `defer`, so the Supabase library downloading over the
+network doesn't block the rest of the page from rendering. The header's
+"Logi sisse" button is real static HTML (not JS-injected) for the same
+reason, so it's visible from first paint even before any of these scripts
+have finished loading — noticeable mainly on a slow/cold connection, e.g. a
+phone on mobile data instead of the same Wi-Fi as a dev machine.
 
 ### Generating the snapshot
 

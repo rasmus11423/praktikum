@@ -231,6 +231,7 @@ function toggleFavorite(id) {
   if (nowFavorited) favorites.add(id);
   else favorites.delete(id);
   saveFavoriteIds(favorites);
+  SupabaseSync?.syncFavorite(id, nowFavorited);
   refreshFavoriteItems();
   return nowFavorited;
 }
@@ -287,6 +288,7 @@ function openModal(id) {
   wireModalButtons(item);
   detailModal.classList.remove("hidden");
   recordView(id);
+  SupabaseSync?.syncRecentlyViewed(id);
 }
 
 function closeModal() {
@@ -518,7 +520,8 @@ clearFiltersBtn.addEventListener("click", () => {
 saveSearchBtn.addEventListener("click", () => {
   const name = prompt("Anna otsingule nimi:");
   if (!name || !name.trim()) return;
-  addSavedSearch(name.trim(), buildQuery().toString());
+  const entry = addSavedSearch(name.trim(), buildQuery().toString());
+  SupabaseSync?.syncSavedSearchAdd(entry);
   alert("Otsing salvestatud — leiad selle oma lehelt.");
 });
 
@@ -628,6 +631,15 @@ async function loadAllItems() {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   ALL_ITEMS = await res.json();
 }
+
+// Fired by supabase-sync.js after a login merge or logout, since those
+// change localStorage out from under the in-memory `favorites` Set this
+// file otherwise only reads once at startup.
+window.addEventListener("supabase-data-changed", () => {
+  favorites = loadFavoriteIds();
+  refreshFavoriteItems();
+  runSearch();
+});
 
 applyFiltersFromUrl();
 statusEl.textContent = "Laen andmeid…";

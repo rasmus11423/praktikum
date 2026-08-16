@@ -1,0 +1,55 @@
+/* ---------- Auth widget (header) + auth modal (login/signup) ---------- */
+
+.header-actions .auth-open-btn {
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.auth-user { display: flex; align-items: center; gap: 10px; }
+.auth-email {
+  color: var(--color-content-secondary);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-field input {
+  border: 1px solid var(--color-border-neutral-secondary);
+  border-radius: var(--corner-radius-m);
+  background: var(--color-bg-neutral-secondary);
+  color: var(--color-content-primary);
+  padding: 12px 14px;
+  font: 450 15px "InterVariable", sans-serif;
+}
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--color-border-action-primary);
+}
+
+.auth-submit { width: 100%; margin-top: 4px; }
+
+.auth-error {
+  color: var(--color-content-danger-primary);
+  background: var(--color-bg-danger-secondary);
+  border-radius: var(--corner-radius-s);
+  padding: 8px 12px;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-switch { margin-top: 16px; color: var(--color-content-tertiary); }
+.auth-switch-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: 4px;
+  color: var(--color-content-link-primary);
+  font: 650 13px "InterVariable", sans-serif;
+  cursor: pointer;
+}
+
+#authModal .modal-card { max-width: 400px; }

@@ -6,6 +6,7 @@
   <title>Praktikaportaal — praktikakohtade otsing</title>
   <link rel="stylesheet" href="css/design-system.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/auth.css">
 </head>
 <body>
   <header class="site-header">
@@ -24,6 +25,7 @@
         </div>
       </div>
       <a class="auth-status bolt-font-body-s-accent" href="profile.html">Minu leht</a>
+      <div id="authWidget"><button type="button" id="authOpenBtn" class="btn-secondary auth-open-btn">Logi sisse</button></div>
     </div>
   </header>
 
@@ -128,7 +130,22 @@
     </div>
   </div>
 
-  <script src="js/search-engine.js"></script>
-  <script src="js/app.js"></script>
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button type="button" id="authModalClose" class="modal-close" aria-label="Sulge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div id="authModalBody"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"
+    integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg"
+    crossorigin="anonymous" defer></script>
+  <script src="js/supabase-client.js" defer></script>
+  <script src="js/supabase-sync.js" defer></script>
+  <script src="js/search-engine.js" defer></script>
+  <script src="js/auth-ui.js" defer></script>
+  <script src="js/app.js" defer></script>
 </body>
 </html>
